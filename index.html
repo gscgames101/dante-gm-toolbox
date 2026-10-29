@@ -261,6 +261,11 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .book-all { --book: var(--ink); color: var(--bg); --cover-rule: currentColor; }
 .book-new { background: transparent; color: var(--muted); border: 2px dashed var(--line); box-shadow: none; justify-content: center; align-items: center; text-align: center; padding: 8px; font-weight: 700; }
 .book-new::after { display: none; }
+/* Smaller shelf in the "Add monsters" popup */
+.shelf.mini { gap: 10px; padding: 8px 6px 10px 2px; margin-bottom: 10px; }
+.shelf.mini .book { width: 4.4rem; height: 6rem; padding: 7px 7px 6px 14px; }
+.shelf.mini .book-title { font-size: .82rem; -webkit-line-clamp: 3; padding: 3px 0; }
+.shelf.mini .book-count { font-size: .68rem; }
 .book-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .92rem; color: var(--muted); }
 .book-bar b { color: var(--ink); font-family: var(--display); font-weight: 400; font-size: 1.15rem; }
 .book-bar .spacer { flex: 1; }
@@ -895,6 +900,7 @@ button.cb-pic { cursor: zoom-in; }
       <h2>Add monsters</h2>
       <button type="button" class="btn primary" data-act="pick-close">Done</button>
     </div>
+    <div class="shelf mini" id="pickShelf" role="group" aria-label="Filter by book" hidden></div>
     <div class="search" style="margin-bottom:10px">
       <input id="pickQ" type="search" placeholder="Search your bestiary…" aria-label="Search monsters" autocomplete="off">
     </div>
@@ -2889,9 +2895,19 @@ function changeHp(id, kind, input) {
   }
   encChanged();
 }
+state.pickBook = 'all';
 function renderPickList() {
+  // Books on top filter the list, like the Bestiary's shelf (smaller tiles).
+  if (state.pickBook !== 'all' && !state.books.some(b => b.id === state.pickBook)) state.pickBook = 'all';
+  const tile = (id, name, count, style, cls) =>
+    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-pickbook="${esc(id)}" aria-pressed="${state.pickBook === id}"${style ? ` style="--book:${style}"` : ''} aria-label="${esc(name)}, ${count} monster${count === 1 ? '' : 's'}">
+      <span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
+  $('#pickShelf').hidden = !state.books.length;
+  $('#pickShelf').innerHTML = state.books.length ? tile('all', 'All', state.monsters.length, '', 'book-all')
+    + sortedBooks().map(b => tile(b.id, b.name, state.monsters.filter(m => inBook(m, b.id)).length, bookColor(b))).join('') : '';
   const q = str($('#pickQ').value).toLowerCase();
-  const arr = state.monsters.filter(m => !q || [m.name, m.type, (m.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
+  const inShelf = state.pickBook === 'all' ? state.monsters : state.monsters.filter(m => inBook(m, state.pickBook));
+  const arr = inShelf.filter(m => !q || [m.name, m.type, (m.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name));
   $('#pickList').innerHTML = arr.length ? arr.map(m => {
     const n = state.enc.list.filter(c => c.monsterId === m.id).length;
@@ -2901,7 +2917,7 @@ function renderPickList() {
       <span class="pick-badge">${n ? '×' + n : ''}</span>
       <span class="sub">CR ${esc(m.cr)} · AC ${m.ac} · HP ${m.hp} · Init ${fmt(mod(m.dex))}</span>
     </button></li>`;
-  }).join('') : `<li class="empty"><p>${state.monsters.length ? 'No monsters match.' : 'Your bestiary is empty. Add monsters in the Bestiary tab first.'}</p></li>`;
+  }).join('') : `<li class="empty"><p>${!state.monsters.length ? 'Your bestiary is empty. Add monsters in the Bestiary tab first.' : !inShelf.length ? 'This book is empty.' : 'No monsters match.'}</p></li>`;
 }
 /* Player popup: names typed before are remembered on this device for quick re-adding. */
 function renderPcSheet() {
@@ -3129,6 +3145,7 @@ document.addEventListener('click', async ev => {
   // books
   if (t.dataset.book) { state.book = t.dataset.book; ls.set('pb-book', state.book); renderList(); $('#listPane').scrollTop = 0; return; }
   if (t.dataset.bk) { t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true')); return; }
+  if (t.dataset.pickbook) { state.pickBook = t.dataset.pickbook; renderPickList(); $('#pickSheet').scrollTop = 0; return; }
   if (t.dataset.bcolor) { state.bookColor = t.dataset.bcolor; renderBookColors(); return; }
   if (t.dataset.fs) {
     ls.set('pb-fs', t.dataset.fs); applyPrefs(); renderSettings();
