@@ -320,7 +320,6 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-rolls h3 { font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 8px 0 8px; }
 .pv-rolls ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .pv-roll { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; align-items: center; padding: 8px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
-.pv-roll:first-child { border-color: var(--accent); }
 .pv-roll.has-pic { grid-template-columns: auto minmax(0, 1fr) auto; }
 .pv-roll.has-pic .tot { grid-column: 3; }
 .pv-thumb.sm { width: 34px; height: 34px; border-radius: 6px; }
@@ -334,6 +333,20 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .send-rolls span { flex: 1; min-width: 0; }
 .pv-dlg { max-width: 520px; }
 .pv-signin { text-align: center; padding-top: 24px; }
+/* The newest monster roll sits at the top so players see it without scrolling. */
+.pv-last { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); }
+.pv-last.has-pic { grid-template-columns: auto minmax(0, 1fr) auto; }
+.pv-last .k { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.pv-last .what { min-width: 0; }
+.pv-last .what b { display: block; font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-last .what span { display: block; font-size: .85rem; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-last .tot { font-family: var(--mono); font-weight: 700; font-size: 2.3rem; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.pv-last .tot.crit { color: var(--good); }
+.pv-last .tot.fumble { color: var(--bad); }
+.pv-last.fresh { animation: pvfresh 1.6s ease-out; }
+@keyframes pvfresh { 0% { background: var(--accent); transform: scale(1.03); } 100% { background: var(--surface); transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pv-last.fresh { animation: none; } }
+.pv-at { margin: 0; text-align: center; font-size: .78rem; color: var(--muted); }
 .pv-steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 .add-row { flex-wrap: wrap; }
 
@@ -552,12 +565,14 @@ button.cb-pic { cursor: zoom-in; }
         <h2>Initiative</h2>
         <div class="round"><span>Round</span><b id="pvRound">—</b></div>
       </div>
+      <section class="pv-last" id="pvLast" aria-live="polite" hidden></section>
       <ol class="pv-list" id="pvList"></ol>
       <section class="pv-rolls" id="pvRollsWrap" hidden>
-        <h3>Monster rolls</h3>
+        <h3>Earlier rolls</h3>
         <ol id="pvRolls"></ol>
       </section>
       <div class="empty" id="pvEmpty"><h3>No fight yet</h3><p>The turn order appears here when your DM starts an encounter. It updates by itself.</p></div>
+      <p class="pv-at" id="pvAt" hidden></p>
       <div class="pv-signin" id="pvSignin" hidden><button type="button" class="btn small ghost" data-act="dm-signin">DM sign in</button></div>
     </div>
   </main>
@@ -2595,6 +2610,7 @@ function publicEnc() {
     rolls: (state.enc.log || []).slice(0, 12).map(r => ({ who: r.who, label: r.label, pretty: r.pretty, rolls: r.rolls, total: r.total, crit: r.crit, round: r.round }))
   };
 }
+let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
   const list = (d && Array.isArray(d.list)) ? d.list.filter(c => c && c.name) : [];
   const ti = list.findIndex(c => c.id === d.turnId);
@@ -2602,9 +2618,25 @@ function renderPlayerView(d) {
   if (ti >= 0) for (let k = 1; k < list.length; k++) { const j = (ti + k) % list.length; if (!list[j].down) { next = j; break; } }
   $('#pvRound').textContent = d && d.round ? d.round : '—';
   $('#pvEmpty').hidden = list.length > 0;
-  const rolls = (d && Array.isArray(d.rolls)) ? d.rolls.filter(r => r && r.who) : [];
-  $('#pvRollsWrap').hidden = !rolls.length;
+  const allRolls = (d && Array.isArray(d.rolls)) ? d.rolls.filter(r => r && r.who) : [];
   const picOf = Object.fromEntries(list.filter(c => isAssetId(c.img)).map(c => [c.name, c]));
+  // Newest roll: big, at the top, and it flashes when a new one arrives.
+  const last = allRolls[0], lastEl = $('#pvLast');
+  lastEl.hidden = !last;
+  if (last) {
+    const key = JSON.stringify(last), pic = picOf[last.who];
+    lastEl.className = 'pv-last' + (pic ? ' has-pic' : '');
+    lastEl.innerHTML = `<span class="k">Latest roll</span>
+      ${pic ? `<button type="button" class="pv-thumb" data-zoom="${pic.img}" aria-label="Show ${esc(last.who)} full size"><img src="${imgSrc(isAssetId(pic.thumb) ? pic.thumb : pic.img)}" alt="" decoding="async" width="48" height="48" onerror="this.remove()"></button>` : ''}
+      <span class="what"><b>${esc(last.who)}: ${esc(last.label)}</b><span>${esc(last.pretty)} → [${(last.rolls || []).map(n => +n).join(', ')}]${last.round ? ` · round ${+last.round}` : ''}</span></span>
+      <span class="tot${last.crit === 'crit' ? ' crit' : last.crit === 'fumble' ? ' fumble' : ''}">${+last.total}${last.crit === 'crit' ? ' ★' : ''}</span>`;
+    if (pvLastKey !== null && key !== pvLastKey) { lastEl.classList.remove('fresh'); void lastEl.offsetWidth; lastEl.classList.add('fresh'); }
+    pvLastKey = key;
+  } else if (d) pvLastKey = '';  // a real update with no rolls yet: the next roll flashes
+  $('#pvAt').hidden = !(d && d.at);
+  if (d && d.at) $('#pvAt').textContent = 'Updated ' + new Date(d.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const rolls = allRolls.slice(1);
+  $('#pvRollsWrap').hidden = !rolls.length;
   $('#pvRolls').innerHTML = rolls.map(r => `
     <li class="pv-roll${picOf[r.who] ? ' has-pic' : ''}">
       ${picOf[r.who] ? `<button type="button" class="pv-thumb sm" data-zoom="${picOf[r.who].img}" aria-label="Show ${esc(r.who)} full size"><img src="${imgSrc(isAssetId(picOf[r.who].thumb) ? picOf[r.who].thumb : picOf[r.who].img)}" alt="" loading="lazy" decoding="async" width="32" height="32" onerror="this.remove()"></button>` : ''}
