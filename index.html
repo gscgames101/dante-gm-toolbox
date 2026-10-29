@@ -728,30 +728,17 @@ button.cb-pic { cursor: zoom-in; }
       <button type="button" class="btn ghost" data-act="close-backup">Close</button>
       <h2>Backup &amp; import</h2>
     </div>
-    <fieldset>
-      <legend>Backup</legend>
-      <p class="hint">All your monsters as JSON. Copy it somewhere safe, or paste it into another copy of Dante's GM Toolbox.</p>
-      <textarea id="exportTxt" readonly rows="8" aria-label="Exported monsters"></textarea>
-      <div class="row-end"><button class="btn" data-act="copy-export">Copy</button></div>
-    </fieldset>
-    <fieldset id="siteExportSet" hidden>
-      <legend>Send to the website</legend>
-      <p class="hint">Saves one file with all your monsters, books, player groups and their pictures. Open the website, sign in, go to <b>Backup &amp; import</b> and choose this file.</p>
+    <fieldset id="exportSet">
+      <legend>Export</legend>
+      <p class="hint" id="exportHint"></p>
       <p class="hint" id="siteExportMsg" hidden></p>
-      <div class="row-end"><button type="button" class="btn primary" data-act="site-export" id="siteExportBtn">Export for the website</button></div>
-    </fieldset>
-    <fieldset id="siteImportSet" hidden>
-      <legend>Bring in from the claude.ai app</legend>
-      <p class="hint">In the claude.ai app, open <b>Backup &amp; import</b> and tap <b>Export for the website</b>. Then choose that file here. The website’s monsters, books and groups are replaced with the ones in the file; your current fight stays.</p>
-      <label class="btn file-btn" for="siteImportFile"><span>Choose the export file</span><input id="siteImportFile" type="file" accept=".json,application/json"></label>
-      <p class="hint" id="siteImportMsg" hidden></p>
+      <div class="row-end"><button type="button" class="btn primary" data-act="site-export" id="siteExportBtn">Export file</button></div>
     </fieldset>
     <fieldset id="importSet">
       <legend>Import</legend>
-      <p class="hint">Paste one monster or a list of monsters in the same JSON format. Each one is added as a new entry.</p>
-      <textarea id="importTxt" rows="8" aria-label="Monsters to import"></textarea>
-      <p class="err" id="importErr" hidden></p>
-      <div class="row-end"><button class="btn primary" data-act="do-import">Import</button></div>
+      <p class="hint" id="importHint"></p>
+      <label class="btn file-btn" for="siteImportFile"><span>Choose a JSON file</span><input id="siteImportFile" type="file" accept=".json,application/json"></label>
+      <p class="hint" id="siteImportMsg" hidden></p>
     </fieldset>
   </div>
 </div>
@@ -2301,20 +2288,33 @@ function toggleNotesFormat() {
   btn.textContent = 'Undo'; msg.textContent = 'Formatted. Tap Undo to get your original text back.';
 }
 
-/* ---------- backup / import ---------- */
+/* ---------- backup / import: one JSON file with the monsters, books, player groups and their pictures ----------
+   The claude.ai app exports it and can import it back (adds and updates, never deletes).
+   The website imports it as a replacement (it's a copy of the app) and can export it too. */
 function openBackup() {
-  const out = state.monsters.map(({ id, ...m }) => m);
-  $('#exportTxt').value = JSON.stringify(out, null, 2);
+  $('#exportHint').textContent = SITE
+    ? 'Saves one file with everything on the website: monsters, books, player groups and their pictures.'
+    : 'Saves one file with all your monsters, books, player groups and their pictures. Keep it as a backup, or import it on the website to play there.';
+  $('#importHint').textContent = SITE
+    ? 'Choose a file exported from the claude.ai app. The website’s monsters, books and groups are replaced with the ones in the file. Your current fight stays.'
+    : 'Choose a backup file. Its monsters, books and groups are added, and ones you already have are updated. Nothing is deleted.';
   $('#importSet').hidden = !state.canWrite;
-  $('#importErr').hidden = true;
-  $('#siteExportSet').hidden = !!SITE || !state.canWrite;
-  $('#siteImportSet').hidden = !SITE || !state.canWrite;
   $('#siteExportMsg').hidden = true; $('#siteImportMsg').hidden = true;
   $('#backup').hidden = false;
 }
-
-/* ---------- moving the bestiary from the claude.ai app to the website ---------- */
 const blobToDataUrl = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+function dataUrlToBlob(d) {
+  const [head, body] = d.split(',');
+  const bin = atob(body), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: (head.match(/^data:([^;]+)/) || [])[1] || 'image/jpeg' });
+}
+// A picture as a data URL (the website reads it from its database).
+async function picData(id) {
+  if (SITE) return SITE.picData(id);
+  const r = await fetch(imgSrc(id)); if (!r.ok) throw new Error('missing');
+  return blobToDataUrl(await r.blob());
+}
 function siteMsg(sel, text, bad) { const el = $(sel); el.hidden = false; el.className = bad ? 'err' : 'hint'; el.textContent = text; }
 async function exportForSite() {
   const btn = $('#siteExportBtn'); btn.disabled = true;
@@ -2325,12 +2325,18 @@ async function exportForSite() {
     const assets = {}; let i = 0, missing = 0;
     for (const id of ids) {
       siteMsg('#siteExportMsg', `Packing pictures… ${++i} of ${ids.size}`);
-      try { const r = await fetch(imgSrc(id)); if (!r.ok) throw new Error(); assets[id] = await blobToDataUrl(await r.blob()); } catch { missing++; }
+      try { assets[id] = await picData(id); } catch { missing++; }
     }
     const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, assets };
     const json = JSON.stringify(data);
     const name = `dante-gm-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
     const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
+    if (SITE) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = name;
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      siteMsg('#siteExportMsg', `Saved ${name}: ${note}`); return;
+    }
     let dl = null; try { dl = await window.claude.use('downloads'); } catch {}
     if (dl) {
       siteMsg('#siteExportMsg', 'Confirm the download to save the file…');
@@ -2343,14 +2349,68 @@ async function exportForSite() {
     siteMsg('#siteExportMsg', 'The export didn’t finish. Try again.', true);
   } finally { btn.disabled = false; }
 }
-async function importSiteFile(file) {
-  if (!file || !SITE || !state.db) return;
+async function importFile(file) {
+  const input = $('#siteImportFile');
+  if (!file) return;
+  input.value = '';
+  if (!state.db) { siteMsg('#siteImportMsg', 'Not connected, so nothing was imported.', true); return; }
   let data;
-  try { data = JSON.parse(await file.text()); } catch { siteMsg('#siteImportMsg', 'That file isn’t an export from the app.', true); return; }
-  if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t an export from the app. Use “Export for the website” there.', true); return; }
+  try { data = JSON.parse(await file.text()); } catch { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
+  // Older backups: one monster, or a plain list of monsters. Each is added as a new entry.
+  if (Array.isArray(data) || (data && !data.format && data.name)) {
+    const list = (Array.isArray(data) ? data : [data]).filter(x => x && typeof x === 'object' && x.name);
+    if (!list.length) { siteMsg('#siteImportMsg', 'No monsters found in that file.', true); return; }
+    showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from this file? Each one is added as a new entry.`, 'Add', () => addMonsterList(list));
+    return;
+  }
+  if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
   const monsters = data.monsters.filter(m => m && m.id && m.name), books = (data.books || []).filter(b => b && b.id && b.name), groups = (data.groups || []).filter(g => g && g.id);
   const assets = Object.entries(data.assets || {}).filter(([id, d]) => isAssetId(id) && typeof d === 'string' && d.startsWith('data:image/'));
-  showConfirm(`Replace the website’s bestiary with this file? ${monsters.length} monsters, ${books.length} books, ${groups.length} groups and ${assets.length} pictures. Your current fight stays.`, 'Replace', async () => {
+  const what = `${monsters.length} monsters, ${books.length} books, ${groups.length} groups and ${assets.length} pictures`;
+  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets));
+  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets));
+}
+async function addMonsterList(list) {
+  let ok = 0;
+  try {
+    for (const m of list) { const { id, ...rest } = m; await state.db.collection('monsters').doc().set(normalize(rest)); siteMsg('#siteImportMsg', `Adding monsters… ${++ok} of ${list.length}`); }
+    siteMsg('#siteImportMsg', `Added ${ok} monster${ok === 1 ? '' : 's'}.`);
+    toast(`Imported ${ok} monster${ok === 1 ? '' : 's'}`);
+  } catch (e) { siteMsg('#siteImportMsg', `Added ${ok} of ${list.length}. ${saveErrorText(e)}`, true); }
+}
+/* claude.ai app: add and update from the file, never delete. Pictures the app already has are reused;
+   the rest are uploaded and the monsters point at the new copies. */
+async function mergeFromFile(monsters, books, groups, assets) {
+  const db = state.db, input = $('#siteImportFile'); input.disabled = true;
+  try {
+    const map = {}; let i = 0;
+    for (const [id, d] of assets) {
+      siteMsg('#siteImportMsg', `Checking pictures… ${++i} of ${assets.length}`);
+      let have = false;
+      try { have = (await fetch(imgSrc(id))).ok; } catch {}
+      if (have) continue;
+      if (!state.assets) { map[id] = ''; continue; }
+      try { map[id] = (await state.assets.upload(dataUrlToBlob(d))).id; } catch { map[id] = ''; }
+    }
+    const fix = v => (isAssetId(v) && v in map) ? map[v] : v;
+    const jobs = [
+      ...books.map(({ id, ...b }) => () => db.collection('books').doc(id).set({ name: b.name, color: b.color, createdAt: b.createdAt || Date.now() })),
+      ...groups.map(({ id, ...g }) => () => db.collection('groups').doc(id).set({ name: g.name, createdAt: g.createdAt || Date.now(),
+        players: cleanPlayers((g.players || []).map(p => ({ ...p, image: fix(p.image), thumb: fix(p.thumb) }))) })),
+      ...monsters.map(({ id, ...m }) => () => db.collection('monsters').doc(id).set(normalize({ ...m, image: fix(m.image), thumb: fix(m.thumb) })))
+    ];
+    let done = 0; const total = jobs.length;
+    const worker = async () => { for (let j; (j = jobs.shift());) { await j(); siteMsg('#siteImportMsg', `Saving… ${++done} of ${total}`); } };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    siteMsg('#siteImportMsg', `Done: ${monsters.length} monsters, ${books.length} books, ${groups.length} groups.`);
+    toast('Import finished');
+  } catch (e) {
+    siteMsg('#siteImportMsg', `The import stopped partway. ${saveErrorText(e)} Choose the file again to finish.`, true);
+  } finally { input.disabled = false; }
+}
+/* Website: make it match the file exactly (it's a copy of the claude.ai app). */
+function replaceFromFile(monsters, books, groups, assets) {
+  return (async () => {
     const db = state.db, input = $('#siteImportFile'); input.disabled = true;
     try {
       // pictures first, a few at a time, so monsters never point at a missing picture
@@ -2375,21 +2435,8 @@ async function importSiteFile(file) {
       toast('Bestiary brought in from the app');
     } catch (e) {
       siteMsg('#siteImportMsg', `The import stopped partway (${(e && (e.code || e.message)) || 'unknown error'}). Choose the file again to finish.`, true);
-    } finally { input.disabled = false; input.value = ''; }
-  });
-}
-async function doImport() {
-  let data;
-  try { data = JSON.parse($('#importTxt').value); } catch { showErr('#importErr', 'That isn’t valid JSON. Paste the full text from a backup.'); return; }
-  const list = (Array.isArray(data) ? data : [data]).filter(x => x && typeof x === 'object' && x.name);
-  if (!list.length) { showErr('#importErr', 'No monsters found. Each one needs at least a "name".'); return; }
-  if (!state.db) { showErr('#importErr', 'Not connected, so nothing was imported.'); return; }
-  let ok = 0;
-  try {
-    for (const m of list) { await state.db.collection('monsters').doc().set(normalize(m)); ok++; }
-  } catch (e) { showErr('#importErr', `Imported ${ok} of ${list.length}. ${saveErrorText(e)}`); return; }
-  $('#importTxt').value = ''; $('#backup').hidden = true;
-  toast(`Imported ${ok} monster${ok === 1 ? '' : 's'}`);
+    } finally { input.disabled = false; }
+  })();
 }
 
 /* ---------- initiative tracker ---------- */
@@ -3136,13 +3183,6 @@ document.addEventListener('click', async ev => {
     case 'hpreset': if (m) { ls.set(hpKey(m.id), null); renderHp(m); } break;
     case 'backup': openBackup(); break;
     case 'close-backup': $('#backup').hidden = true; break;
-    case 'copy-export': {
-      const ta = $('#exportTxt');
-      try { await navigator.clipboard.writeText(ta.value); toast('Copied'); }
-      catch { ta.focus(); ta.select(); toast('Selected. Copy it with your device’s copy command.'); }
-      break;
-    }
-    case 'do-import': doImport(); break;
   }
 });
 $('#trayToggle').addEventListener('click', e => {
@@ -3276,7 +3316,7 @@ $('#cbList').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches('.cb-init')) e.target.blur();
 });
 $('#pickQ').addEventListener('input', renderPickList);
-$('#siteImportFile').addEventListener('change', e => importSiteFile(e.target.files && e.target.files[0]));
+$('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
 
 /* ---------- boot ---------- */
 async function waitForClaude() {

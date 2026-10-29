@@ -84,7 +84,8 @@
     user: () => auth.currentUser,
     watchPlayers: cb => fs.doc('public/current').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}),
     putAsset,
-    imgSrc: id => window.SITE_imgSrc(id)
+    imgSrc: id => window.SITE_imgSrc(id),
+    picData: id => loadPic(id).then(d => { if (!d) throw new Error('missing'); return d; })
   };
 
   /* Pictures. Normally the service worker answers _blob/<id> from the database and keeps a copy on the device.
