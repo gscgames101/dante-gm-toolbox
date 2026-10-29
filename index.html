@@ -418,6 +418,16 @@ button.cb-pic { cursor: zoom-in; }
 .paste-img { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .paste-img .hint { flex-basis: 100%; }
 .paste-box textarea.reading { opacity: .8; }
+/* Start from a monster */
+.base-q { width: calc(100% - 28px); min-height: 42px; margin: 8px 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); }
+.base-list { display: grid; gap: 4px; margin-bottom: 8px; }
+.base-list:empty { display: none; }
+.base-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; min-height: 48px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
+.base-row:hover { border-color: var(--accent); }
+.base-row .thumb { grid-row: auto; width: 36px; height: 36px; font-size: 1rem; }
+.base-row .nm { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.base-row .nm small { display: block; font-weight: 400; font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.base-row .cr { font-family: var(--mono); font-size: .85rem; color: var(--accent); }
 /* Header gear + settings */
 .icon-btn { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 0; }
 .icon-btn:hover { color: var(--accent); border-color: var(--line); }
@@ -610,6 +620,14 @@ button.cb-pic { cursor: zoom-in; }
       <button type="submit" class="btn primary" id="edSave">Save</button>
     </div>
     <p class="err" id="edErr" hidden></p>
+
+    <details class="paste-box" id="baseBox">
+      <summary>Start from a monster in your bestiary</summary>
+      <p class="hint" style="margin:0">Making a variant? Pick a monster and its whole stat block fills in below. Change what you need, give it a new name and tap Save. The original stays as it is.</p>
+      <input id="baseQ" type="search" class="base-q" placeholder="Search your bestiary, e.g. red dragon" aria-label="Search your bestiary for a base monster" autocomplete="off">
+      <div class="base-list" id="baseList" role="list"></div>
+      <p class="hint" id="baseMsg" style="margin:0" hidden></p>
+    </details>
 
     <details class="paste-box" id="pasteBox">
       <summary>Paste a stat block</summary>
@@ -1849,6 +1867,9 @@ function openEditor(m, editingId) {
   if (!m) d.name = '';
   $('#edTitle').textContent = editingId ? 'Edit monster' : 'New monster';
   $('#pasteBox').open = false; $('#pasteTxt').value = ''; $('#pasteMsg').hidden = true;
+  // "Start from a monster" is for new monsters only (a monster being edited already has its stat block).
+  $('#baseBox').hidden = !!editingId || !state.monsters.length;
+  $('#baseBox').open = false; $('#baseQ').value = ''; $('#baseList').innerHTML = ''; $('#baseMsg').hidden = true;
   notesUndo = null; $('#notesFmtBtn').textContent = 'Auto-format'; $('#notesFmtMsg').textContent = 'Pasted from a PDF? Auto-format fixes broken lines and spacing.';
   FIELDS.forEach(k => { const el = $('#f-' + k); if (el) el.value = d[k] ?? ''; });
   // Point each dropdown at the saved value, or at "Other…" with the custom text showing.
@@ -2199,6 +2220,36 @@ function parseStatBlock(text) {
   delete raw.typeLine;
   return { raw, found };
 }
+/* ---------- start a new monster from one in the bestiary ---------- */
+function renderBaseList() {
+  const q = str($('#baseQ').value).toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean);
+  if (!words.length) { $('#baseList').innerHTML = ''; return; }
+  const hits = state.monsters
+    .filter(m => { const hay = `${m.name} ${m.type || ''} ${(m.tags || []).join(' ')}`.toLowerCase(); return words.every(w => hay.includes(w)); })
+    .sort((a, b) => (a.name.toLowerCase().startsWith(words[0]) ? 0 : 1) - (b.name.toLowerCase().startsWith(words[0]) ? 0 : 1) || a.name.localeCompare(b.name))
+    .slice(0, 8);
+  $('#baseList').innerHTML = hits.length ? hits.map(m => `
+    <button type="button" class="base-row" role="listitem" data-act="base-pick" data-id="${esc(m.id)}">
+      ${isAssetId(m.image) ? `<img class="thumb" src="${thumbSrc(m)}" alt="" loading="lazy" decoding="async" width="36" height="36">` : `<span class="thumb" aria-hidden="true">${esc((m.name || '?')[0].toUpperCase())}</span>`}
+      <span class="nm">${esc(m.name)}<small>${esc([m.size, m.type].filter(Boolean).join(' '))}</small></span>
+      <span class="cr">CR ${esc(m.cr || '—')}</span>
+    </button>`).join('') : '<p class="hint" style="margin:0">No monsters match that.</p>';
+}
+function startFromMonster(id) {
+  const src = state.monsters.find(x => x.id === id); if (!src) return;
+  const { id: _id, createdAt, updatedAt, ...copy } = src;
+  const uploaded = state.edUploaded;
+  // Same picture, books, tags and notes as the original (the picture is shared, never duplicated).
+  openEditor({ ...copy, name: `${src.name} (variant)`, createdAt: Date.now() }, null);
+  state.edUploaded = uploaded;
+  setTimeout(() => { state.edBaseline = ''; }, 0);  // counts as unsaved changes, so Cancel/Esc asks first
+  const box = $('#baseBox'); box.open = true;
+  const msg = $('#baseMsg'); msg.hidden = false; msg.className = 'hint ok';
+  msg.textContent = `Started from ${src.name}. Change what you need, rename it, then tap Save.`;
+  const name = $('#f-name'); name.focus(); name.select();
+}
+
 function pasteFill() {
   const text = $('#pasteTxt').value;
   const msg = $('#pasteMsg');
@@ -3215,6 +3266,7 @@ document.addEventListener('click', async ev => {
     case 'hpreset': if (m) { ls.set(hpKey(m.id), null); renderHp(m); } break;
     case 'backup': openBackup(); break;
     case 'close-backup': $('#backup').hidden = true; break;
+    case 'base-pick': startFromMonster(t.dataset.id); break;
   }
 });
 $('#trayToggle').addEventListener('click', e => {
@@ -3348,6 +3400,8 @@ $('#cbList').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.matches('.cb-init')) e.target.blur();
 });
 $('#pickQ').addEventListener('input', renderPickList);
+$('#baseQ').addEventListener('input', renderBaseList);
+$('#baseQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const first = $('#baseList [data-act="base-pick"]'); if (first) startFromMonster(first.dataset.id); } });
 $('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
 
 /* ---------- boot ---------- */
