@@ -261,6 +261,9 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .book-all { --book: var(--ink); color: var(--bg); --cover-rule: currentColor; }
 .book-new { background: transparent; color: var(--muted); border: 2px dashed var(--line); box-shadow: none; justify-content: center; align-items: center; text-align: center; padding: 8px; font-weight: 700; }
 .book-new::after { display: none; }
+/* "Add monsters": title, books and search stay put; only the monster list scrolls */
+.pick-top { position: sticky; top: 0; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.pick-top .sheet-head { position: static; margin-bottom: 0; border-bottom: 0; }
 /* Smaller shelf in the "Add monsters" popup */
 .shelf.mini { gap: 10px; padding: 8px 6px 10px 2px; margin-bottom: 10px; }
 .shelf.mini .book { width: 4.4rem; height: 6rem; padding: 7px 7px 6px 14px; }
@@ -896,15 +899,17 @@ button.cb-pic { cursor: zoom-in; }
 
 <div class="sheet" id="pickSheet" hidden>
   <div class="sheet-in gutter">
-    <div class="sheet-head">
-      <h2>Add monsters</h2>
-      <button type="button" class="btn primary" data-act="pick-close">Done</button>
+    <div class="pick-top">
+      <div class="sheet-head">
+        <h2>Add monsters</h2>
+        <button type="button" class="btn primary" data-act="pick-close">Done</button>
+      </div>
+      <div class="shelf mini" id="pickShelf" role="group" aria-label="Filter by book" hidden></div>
+      <div class="search" style="margin-bottom:10px">
+        <input id="pickQ" type="search" placeholder="Search your bestiary…" aria-label="Search monsters" autocomplete="off">
+      </div>
+      <p class="hint" style="margin:0;padding-bottom:8px">Tap a monster to add one. Tap again to add another. Each rolls its own initiative.</p>
     </div>
-    <div class="shelf mini" id="pickShelf" role="group" aria-label="Filter by book" hidden></div>
-    <div class="search" style="margin-bottom:10px">
-      <input id="pickQ" type="search" placeholder="Search your bestiary…" aria-label="Search monsters" autocomplete="off">
-    </div>
-    <p class="hint" style="margin:0 0 8px">Tap a monster to add one. Tap again to add another. Each rolls its own initiative.</p>
     <ul class="mlist" id="pickList"></ul>
   </div>
 </div>
