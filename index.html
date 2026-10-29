@@ -773,6 +773,10 @@ button.cb-pic { cursor: zoom-in; }
         </div>
       </div>
       <p class="hint" style="margin:0">These are saved on this device only.</p>
+      <div class="set-row" id="backupRow">
+        <div class="set-txt"><b>Backup &amp; import</b><span class="hint">Save your bestiary, send it to the website, or bring monsters in</span></div>
+        <button type="button" class="btn small" data-act="set-backup">Open</button>
+      </div>
       <div class="set-row" id="acctRow" hidden>
         <div class="set-txt"><b>Signed in</b><span class="hint" id="acctTxt"></span></div>
         <button type="button" class="btn small" data-act="dm-signout">Sign out</button>
@@ -1046,6 +1050,7 @@ function renderSettings() {
   $('#darkSwitch').setAttribute('aria-checked', String(isDark()));
   const fs = ls.get('pb-fs', 'm');
   document.querySelectorAll('[data-fs]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fs === fs)));
+  $('#backupRow').hidden = state.role !== 'dm';
   const who = SITE && SITE.user();
   $('#acctRow').hidden = !who;
   if (who) $('#acctTxt').textContent = who.email || '';
@@ -3075,6 +3080,7 @@ document.addEventListener('click', async ev => {
     }
     case 'set-open': renderSettings(); $('#setSheet').hidden = false; break;
     case 'set-close': $('#setSheet').hidden = true; break;
+    case 'set-backup': $('#setSheet').hidden = true; openBackup(); break;
     case 'toggle-dark': {
       const next = isDark() ? 'light' : 'dark';
       document.documentElement.dataset.theme = next; ls.set('pb-theme', next); renderSettings();
