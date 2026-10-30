@@ -413,6 +413,8 @@ button.cb-pic { cursor: zoom-in; }
 .cb-acts { display: flex; gap: 4px; align-items: center; }
 .cb-hp { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 4px; }
 .cb-hp input { width: 6em; height: 36px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); text-align: center; }
+.cb-max { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: .82rem; font-weight: 700; color: var(--muted); }
+.cb-hp .cb-max input { width: 4.6em; font-family: var(--mono); font-weight: 700; color: var(--ink); }
 .cb-card { max-width: 720px; display: grid; gap: 6px; padding: 10px 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--sunk); }
 .cb-card-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .cb-card-top b { font-size: 1.05rem; }
@@ -2875,7 +2877,22 @@ function hpPanel(c, ctx) {
     <button type="button" class="btn small" data-cb-dmg="${c.id}">Damage</button>
     <button type="button" class="btn small" data-cb-heal="${c.id}">Heal</button>
     <button type="button" class="btn small ghost" data-cb-full="${c.id}">Full</button>
+    <label class="cb-max" title="Changes only this creature in the fight, not its stat block">Max HP
+      <input id="max-${ctx}-${c.id}" type="number" min="1" max="9999" inputmode="numeric" value="${c.maxHp}" data-cb-max="${c.id}" aria-label="Max HP for ${esc(c.name)} in this fight"></label>
   </div>`;
+}
+/* Max HP for one creature in this fight only (the bestiary stat block is untouched).
+   Raising it adds the difference to current HP; lowering it caps current HP at the new max. */
+function setMaxHp(id, value) {
+  const c = encFind(id), n = intOrNull(value);
+  if (!c) return;
+  if (n == null || n < 1) { renderEncounter(); return; }  // empty or nonsense: put the old value back
+  const max = Math.min(9999, n), diff = max - c.maxHp;
+  if (!diff) return;
+  c.maxHp = max;
+  c.hp = diff > 0 ? c.hp + diff : Math.min(c.hp, max);
+  encChanged();
+  toast(`${c.name}: max HP ${max} (this fight only)`);
 }
 function hpLow(c) { return c.hp <= c.maxHp / 2; }
 /* Combatant picture: monsters use their bestiary picture, players their group picture. Tap to see it full size. */
@@ -3538,6 +3555,9 @@ document.addEventListener('wheel', e => {
   e.preventDefault();
   row.scrollLeft += dy;
 }, { passive: false });
+// Max HP box in the tracker's HP panels (row, side panel and phone sheet).
+document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.cbMax) setMaxHp(e.target.dataset.cbMax, e.target.value); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.cbMax) e.target.blur(); });
 $('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
 
 /* ---------- boot ---------- */
