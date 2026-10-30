@@ -488,10 +488,13 @@ button.cb-pic { cursor: zoom-in; }
   .detail-wrap .sb, .detail-wrap .notes, .cb-card { max-width: none; }
   .tabs { grid-template-columns: repeat(2, minmax(0, 340px)); justify-content: center; }
   .sheet-in { max-width: 960px; }
-  .pv-wrap { max-width: 1280px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); column-gap: 32px; align-items: start; }
-  .pv-wrap > * { grid-column: 1 / -1; }
-  .pv-wrap > .pv-list { grid-column: 1; }
-  .pv-wrap > .pv-rolls { grid-column: 2; }
+  /* Players' screen: no rolls yet = one centred column; with rolls = turn order on the left,
+     latest + earlier rolls stacked on the right ("dense" lets the list fill the left beside them). */
+  .pv-wrap { max-width: 760px; }
+  .pv-wrap.has-rolls { max-width: 1280px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); column-gap: 32px; align-items: start; grid-auto-flow: row dense; }
+  .pv-wrap.has-rolls > * { grid-column: 1 / -1; }
+  .pv-wrap.has-rolls > .pv-list { grid-column: 1; grid-row: span 2; }
+  .pv-wrap.has-rolls > .pv-last, .pv-wrap.has-rolls > .pv-rolls { grid-column: 2; }
   .pv-rolls h3 { margin-top: 0; }
 }
 @media (min-width: 1500px) {
@@ -2683,6 +2686,7 @@ function renderPlayerView(d) {
   const allRolls = (d && Array.isArray(d.rolls)) ? d.rolls.filter(r => r && r.who) : [];
   const picOf = Object.fromEntries(list.filter(c => isAssetId(c.img)).map(c => [c.name, c]));
   // Newest roll: big, at the top, and it flashes when a new one arrives.
+  document.querySelector('.pv-wrap').classList.toggle('has-rolls', allRolls.length > 0);
   const last = allRolls[0], lastEl = $('#pvLast');
   lastEl.hidden = !last;
   if (last) {
