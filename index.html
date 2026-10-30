@@ -464,7 +464,16 @@ button.cb-pic { cursor: zoom-in; }
 .grp-card-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .prows, .irows { display: grid; gap: 8px; }
 .paste-zone.pchip { min-width: 0; width: 64px; min-height: 42px; padding: 0 6px; display: grid; place-items: center; font-size: .78rem; }
-.prow { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.prow .pac { width: 3.6rem; padding: 6px 4px; text-align: center; font-family: var(--mono); }
+.pc-ac { display: inline-flex; align-items: center; gap: 6px; }
+.cb-ac { width: 3.4rem; height: 30px; padding: 0 4px; text-align: center; font-family: var(--mono); font-weight: 700; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
+#pcAc { width: 4.2em; text-align: center; }
+@media (max-width: 420px) {
+  .prow { gap: 6px; padding: 6px; }
+  .prow .pac { width: 2.9rem; }
+  .paste-zone.pchip { width: 46px; font-size: .7rem; padding: 0 2px; }
+}
+.prow { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .prow input { width: 100%; min-height: 42px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-weight: 700; }
 .ppic { width: 52px; height: 52px; padding: 0; border-radius: 10px; border: 1px dashed var(--muted); background: var(--sunk); overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: .7rem; line-height: 1.1; text-align: center; }
 .ppic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -926,6 +935,7 @@ button.cb-pic { cursor: zoom-in; }
     <form class="add-pc" id="pcForm" autocomplete="off">
       <input id="pcName" placeholder="Player name" aria-label="Player name" maxlength="40">
       <input id="pcInit" type="number" placeholder="Init" aria-label="Initiative" min="-10" max="50">
+      <input id="pcAc" type="number" inputmode="numeric" placeholder="AC" aria-label="Armor Class" min="0" max="40">
       <button class="btn primary" type="submit">Add</button>
     </form>
     <p class="hint" style="margin:8px 0 0">Add as many as you need, then tap Done.</p>
@@ -960,7 +970,7 @@ button.cb-pic { cursor: zoom-in; }
         <span class="lbl">Players</span>
         <div class="prows" id="grpPlayers"></div>
         <div><button type="button" class="btn small" data-act="grp-add-player">+ Add player</button></div>
-        <span class="hint">Tap the square to choose a picture, or paste one into the Paste box (Ctrl+V on a PC). Players see it next to their name.</span>
+        <span class="hint">Tap the square to choose a picture, or paste one into the Paste box (Ctrl+V on a PC). Players see it next to their name. AC is optional and only you see it; you can also change it in the tracker during a fight.</span>
       </div>
       <p class="err" id="grpErr" hidden></p>
       <div class="row-end">
@@ -2760,8 +2770,8 @@ function encSorted() {
   return [...state.enc.list].sort((a, b) => (b.init - a.init) || ((b.tie || 0) - (a.tie || 0)) || ((a.order || 0) - (b.order || 0)));
 }
 const encFind = id => state.enc.list.find(c => c.id === id);
-function addPc(name, init) {
-  state.enc.list.push({ id: uid(), kind: 'pc', name, init, tie: 0, order: Date.now() + encOrder++ });
+function addPc(name, init, ac) {
+  state.enc.list.push({ id: uid(), kind: 'pc', name, init, tie: 0, order: Date.now() + encOrder++, ac: acOrNull(ac) });
   encChanged();
 }
 function addMonsterToFight(m) {
@@ -2834,6 +2844,7 @@ function cbRow(c, current) {
     ${cbPic(c)}
     <div class="cb-main">
       <div class="cb-name">${esc(c.name)}${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}</div>
+      ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="number" inputmode="numeric" min="0" max="40" value="${c.ac != null ? +c.ac : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
       ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button></div>
       <div class="hp-bar"><i class="${hpLow(c) ? 'low' : ''}" style="width:${pct}%"></i></div>` : ''}
     </div>
@@ -2957,8 +2968,11 @@ function showConfirm(msg, yesLabel, fn) {
 /* ---------- player groups ---------- */
 // Saved parties (groups/<id>: {name, players:[{id, name, image, thumb}]}), added to a fight in one go.
 state.groups = []; state.grp = null; state.grpUploaded = []; state.grpPicFor = null; state.grpInitFor = null;
+// A player's Armor Class: a whole number 0–40, or null when not set.
+const acOrNull = v => { const n = intOrNull(v); return n == null ? null : Math.max(0, Math.min(40, n)); };
 const cleanPlayers = a => (Array.isArray(a) ? a : []).filter(p => p && str(p.name)).map(p => ({
   id: /^[A-Za-z0-9_-]{1,40}$/.test(str(p.id)) ? str(p.id) : uid(), name: str(p.name).slice(0, 40),
+  ac: acOrNull(p.ac),
   image: isAssetId(p.image) ? p.image : '', thumb: isAssetId(p.image) && isAssetId(p.thumb) ? p.thumb : ''
 }));
 function avatarHtml(p) {
@@ -2995,12 +3009,17 @@ function editGroup(g) {
 }
 function readGrpNames() {
   if (!state.grp) return;
-  document.querySelectorAll('#grpPlayers .prow').forEach(r => { const p = state.grp.players.find(x => x.id === r.dataset.pid); if (p) p.name = r.querySelector('input').value; });
+  document.querySelectorAll('#grpPlayers .prow').forEach(r => {
+    const p = state.grp.players.find(x => x.id === r.dataset.pid); if (!p) return;
+    p.name = r.querySelector('input').value;
+    const ac = r.querySelector('.pac'); if (ac) p.ac = acOrNull(ac.value);
+  });
 }
 function renderGrpPlayers() {
   $('#grpPlayers').innerHTML = state.grp.players.map(p => `<div class="prow" data-pid="${esc(p.id)}">
       <button type="button" class="ppic${isAssetId(p.image) ? ' has' : ''}" data-ppic="${esc(p.id)}" aria-label="Picture for ${esc(p.name || 'this player')}">${p.uploading ? '…' : isAssetId(p.image) ? `<img src="${imgSrc(isAssetId(p.thumb) ? p.thumb : p.image)}" alt="">` : 'Add<br>picture'}</button>
       <input id="pn-${esc(p.id)}" value="${esc(p.name)}" placeholder="Player name" aria-label="Player name" maxlength="40">
+      <input class="pac" id="pa-${esc(p.id)}" type="number" inputmode="numeric" min="0" max="40" value="${p.ac != null ? +p.ac : ''}" placeholder="AC" aria-label="Armor Class for ${esc(p.name || 'this player')}">
       <div class="paste-zone pchip" contenteditable="true" role="textbox" data-ppaste="${esc(p.id)}" aria-label="Paste a picture for ${esc(p.name || 'this player')}" data-ph="Paste"></div>
       <button type="button" class="btn small ghost" data-prm="${esc(p.id)}" aria-label="Remove player">✕</button>
     </div>`).join('');
@@ -3094,7 +3113,7 @@ function addGroupToFight(e) {
     const inp = document.getElementById('gi-' + p.id);
     if (!inp || inp.disabled) return;
     const v = intOrNull(inp.value); if (v == null) blanks++;
-    state.enc.list.push({ id: uid(), kind: 'pc', name: p.name, init: v == null ? 0 : v, tie: 0, order: Date.now() + encOrder++,
+    state.enc.list.push({ id: uid(), kind: 'pc', name: p.name, init: v == null ? 0 : v, tie: 0, order: Date.now() + encOrder++, ac: acOrNull(p.ac),
       img: isAssetId(p.image) ? p.image : '', thumb: isAssetId(p.image) && isAssetId(p.thumb) ? p.thumb : '' });
     added++;
   });
@@ -3411,19 +3430,25 @@ $('#pcForm').addEventListener('submit', e => {
   const name = str($('#pcName').value), init = intOrNull($('#pcInit').value);
   if (!name) { $('#pcName').focus(); return; }
   if (init == null) { $('#pcInit').focus(); toast('Enter the player’s initiative roll.'); return; }
-  addPc(name.slice(0, 40), init);
+  addPc(name.slice(0, 40), init, $('#pcAc').value);
   rememberPlayer(name.slice(0, 40));
   toast(`Added ${name} (${init})`);
-  $('#pcName').value = ''; $('#pcInit').value = ''; $('#pcName').focus();
+  $('#pcName').value = ''; $('#pcInit').value = ''; $('#pcAc').value = ''; $('#pcName').focus();
   renderPcSheet();
 });
 $('#cbList').addEventListener('change', e => {
+  // A player's AC, changed right in the tracker (Shield, a buff…). Empty clears it.
+  if (e.target.dataset.cbAc) {
+    const c = encFind(e.target.dataset.cbAc), v = acOrNull(e.target.value);
+    if (c && v !== (c.ac ?? null)) { c.ac = v; encChanged(); }
+    return;
+  }
   const id = e.target.dataset.cbInit; if (!id) return;
   const c = encFind(id), v = intOrNull(e.target.value);
   if (c && v != null && v !== c.init) { c.init = v; encChanged(); }
 });
 $('#cbList').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches('.cb-init')) e.target.blur();
+  if (e.key === 'Enter' && e.target.matches('.cb-init, .cb-ac')) e.target.blur();
 });
 $('#pickQ').addEventListener('input', renderPickList);
 $('#baseQ').addEventListener('input', renderBaseList);
