@@ -3525,6 +3525,18 @@ $('#cbList').addEventListener('keydown', e => {
 $('#pickQ').addEventListener('input', renderPickList);
 $('#baseQ').addEventListener('input', renderBaseList);
 $('#baseQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const first = $('#baseList [data-act="base-pick"]'); if (first) startFromMonster(first.dataset.id); } });
+/* Mouse wheel over a sideways row (book shelves, type tags) scrolls it sideways. At either end the wheel
+   goes back to scrolling the page. Trackpads that already scroll sideways are left alone. */
+document.addEventListener('wheel', e => {
+  const row = e.target.closest && e.target.closest('.shelf, .chips');
+  if (!row || e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+  const max = row.scrollWidth - row.clientWidth;
+  if (max <= 1) return;
+  const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaMode === 2 ? e.deltaY * row.clientWidth : e.deltaY;
+  if ((dy < 0 && row.scrollLeft <= 0) || (dy > 0 && row.scrollLeft >= max - 1)) return;
+  e.preventDefault();
+  row.scrollLeft += dy;
+}, { passive: false });
 $('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
 
 /* ---------- boot ---------- */
