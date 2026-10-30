@@ -2463,7 +2463,8 @@ async function importFile(file) {
   if (Array.isArray(data) || (data && !data.format && data.name)) {
     const list = (Array.isArray(data) ? data : [data]).filter(x => x && typeof x === 'object' && x.name);
     if (!list.length) { siteMsg('#siteImportMsg', 'No monsters found in that file.', true); return; }
-    showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from this file? Each one is added as a new entry.`, 'Add', () => addMonsterList(list));
+    const bookNames = [...new Set(list.flatMap(m => Array.isArray(m.books) ? m.books.map(str).filter(Boolean) : []))];
+    showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from this file?${bookNames.length ? ` They go in: ${bookNames.join(', ')}.` : ''} Each one is added as a new entry; nothing is replaced.`, 'Add', () => addMonsterList(list));
     return;
   }
   if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
@@ -2473,10 +2474,30 @@ async function importFile(file) {
   if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets));
   else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets));
 }
+/* A monster in an import file can name its books ("books": ["WOW"]): it's filed in the book with that name,
+   which is created if this bestiary doesn't have it yet. */
+async function bookIdsByName(names) {
+  const ids = [];
+  for (const raw of names) {
+    const n = str(raw).slice(0, 40); if (!n) continue;
+    let b = state.books.find(x => x.name.toLowerCase() === n.toLowerCase());
+    if (!b) {
+      const ref = state.db.collection('books').doc(), color = Object.keys(BOOK_COLORS)[state.books.length % 8];
+      await ref.set({ name: n, color, createdAt: Date.now() });
+      b = { id: ref.id, name: n, color }; state.books.push(b);
+    }
+    ids.push(b.id);
+  }
+  return ids;
+}
 async function addMonsterList(list) {
   let ok = 0;
   try {
-    for (const m of list) { const { id, ...rest } = m; await state.db.collection('monsters').doc().set(normalize(rest)); siteMsg('#siteImportMsg', `Adding monsters… ${++ok} of ${list.length}`); }
+    for (const m of list) {
+      const { id, books, ...rest } = m;
+      if (Array.isArray(books) && books.length) rest.bookIds = [...(Array.isArray(rest.bookIds) ? rest.bookIds : []), ...await bookIdsByName(books)];
+      await state.db.collection('monsters').doc().set(normalize(rest)); siteMsg('#siteImportMsg', `Adding monsters… ${++ok} of ${list.length}`);
+    }
     siteMsg('#siteImportMsg', `Added ${ok} monster${ok === 1 ? '' : 's'}.`);
     toast(`Imported ${ok} monster${ok === 1 ? '' : 's'}`);
   } catch (e) { siteMsg('#siteImportMsg', `Added ${ok} of ${list.length}. ${saveErrorText(e)}`, true); }
