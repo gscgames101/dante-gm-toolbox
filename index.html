@@ -398,6 +398,11 @@ button.cb-pic { cursor: zoom-in; }
 .pc-tag, .down-tag { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; border-radius: 999px; vertical-align: 2px; margin-left: 4px; }
 .pc-tag { background: var(--sunk); color: var(--muted); }
 .down-tag { background: var(--bad); color: var(--surface); }
+/* Hidden monsters: in the DM's tracker only */
+.hide-tag { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; border-radius: 999px; vertical-align: 2px; margin-left: 4px; background: var(--ink); color: var(--bg); }
+.cb.hidden-mon { border-style: dashed; border-color: var(--muted); }
+.cb-hide { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 4px; font-size: .84rem; color: var(--muted); cursor: pointer; }
+.cb-hide input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .hp-pill { font-family: var(--mono); font-weight: 700; font-size: .86rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-height: 28px; }
 .hp-pill.low { color: var(--bad); border-color: var(--bad); }
 .cb .hp-bar { flex-basis: auto; }
@@ -2673,17 +2678,20 @@ function syncPlayersIfStale() {
   schedulePlayersUpdate(300);
 }
 function publicEnc() {
+  // Hidden monsters (and their rolls) never reach the players. On a hidden monster's turn nobody is highlighted.
+  const hiddenNames = new Set(state.enc.list.filter(c => c.hidden).map(c => c.name));
+  const cur = encFind(state.enc.turnId);
   return {
     round: state.enc.round || 0,
-    turnId: state.enc.turnId || null,
-    list: encSorted().map(c => {
+    turnId: cur && !cur.hidden ? cur.id : null,
+    list: encSorted().filter(c => !c.hidden).map(c => {
       // the monster's picture (players see the thumbnail and can open the full image)
       // players carry their own picture (from their group); monsters use their bestiary picture
       const src = c.kind === 'monster' ? (state.monsters.find(x => x.id === c.monsterId) || {}) : { image: c.img, thumb: c.thumb };
       const img = isAssetId(src.image) ? src.image : '';
       return { id: c.id, name: c.name, pc: c.kind === 'pc', down: c.kind === 'monster' && c.hp <= 0, img, thumb: img && isAssetId(src.thumb) ? src.thumb : '' };
     }),
-    rolls: (state.enc.log || []).slice(0, 12).map(r => ({ who: r.who, label: r.label, pretty: r.pretty, rolls: r.rolls, total: r.total, crit: r.crit, round: r.round }))
+    rolls: (state.enc.log || []).filter(r => !hiddenNames.has(r.who)).slice(0, 12).map(r => ({ who: r.who, label: r.label, pretty: r.pretty, rolls: r.rolls, total: r.total, crit: r.crit, round: r.round }))
   };
 }
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
@@ -2840,13 +2848,14 @@ function cbPic(c) {
 function cbRow(c, current) {
   const mon = c.kind === 'monster', down = mon && c.hp <= 0, open = state.hpOpen === c.id;
   const pct = mon ? Math.max(0, Math.min(100, c.hp / c.maxHp * 100)) : 0;
-  return `<li class="cb${current ? ' current' : ''}${down ? ' down' : ''}" data-cb="${c.id}"${current ? ' aria-current="true"' : ''}>
+  return `<li class="cb${current ? ' current' : ''}${down ? ' down' : ''}${c.hidden ? ' hidden-mon' : ''}" data-cb="${c.id}"${current ? ' aria-current="true"' : ''}>
     <input class="cb-init" id="init-${c.id}" type="number" value="${c.init}" data-cb-init="${c.id}" aria-label="Initiative for ${esc(c.name)}">
     ${cbPic(c)}
     <div class="cb-main">
-      <div class="cb-name">${esc(c.name)}${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}</div>
+      <div class="cb-name">${esc(c.name)}${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}${c.hidden ? '<span class="hide-tag">HIDDEN</span>' : ''}</div>
       ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="text" maxlength="8" autocomplete="off" value="${c.ac != null ? esc(String(c.ac)) : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
-      ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button></div>
+      ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button>
+        <label class="cb-hide" title="Hidden monsters don't appear on the players' screen"><input type="checkbox" data-cb-hide="${c.id}"${c.hidden ? ' checked' : ''}> Hidden</label></div>
       <div class="hp-bar"><i class="${hpLow(c) ? 'low' : ''}" style="width:${pct}%"></i></div>` : ''}
     </div>
     <div class="cb-acts">
@@ -3454,6 +3463,13 @@ $('#pcForm').addEventListener('submit', e => {
   renderPcSheet();
 });
 $('#cbList').addEventListener('change', e => {
+  // Hide or reveal a monster: the players' screen changes right away.
+  if (e.target.dataset.cbHide) {
+    const c = encFind(e.target.dataset.cbHide); if (!c) return;
+    c.hidden = e.target.checked; encChanged(); schedulePlayersUpdate(300);
+    toast(c.hidden ? `${c.name} is hidden from the players` : `${c.name} is now visible to the players`);
+    return;
+  }
   // A player's AC, changed right in the tracker (Shield, a buff…). Empty clears it.
   if (e.target.dataset.cbAc) {
     const c = encFind(e.target.dataset.cbAc), v = acOrNull(e.target.value);
