@@ -2847,6 +2847,7 @@ function removeFromFight(id) {
   if (state.encSel === id) state.encSel = null;
   if (state.hpOpen === id) state.hpOpen = null;
   encChanged();
+  schedulePlayersUpdate(300);  // the creature leaves the players' screen right away
 }
 function moveTurn(step) {
   const s = encSorted(); if (!s.length) return;
