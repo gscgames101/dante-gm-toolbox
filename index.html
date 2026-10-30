@@ -403,6 +403,10 @@ button.cb-pic { cursor: zoom-in; }
 .cb.hidden-mon { border-style: dashed; border-color: var(--muted); }
 .cb-hide { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 4px; font-size: .84rem; color: var(--muted); cursor: pointer; }
 .cb-hide input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.pick-opts { margin: 0 0 6px; }
+.pick-hide { font-size: .95rem; color: var(--ink); font-weight: 700; flex-wrap: wrap; padding: 4px 0; }
+.pick-hide .hint { font-weight: 400; }
+.pick-hide input { width: 20px; height: 20px; }
 .hp-pill { font-family: var(--mono); font-weight: 700; font-size: .86rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-height: 28px; }
 .hp-pill.low { color: var(--bad); border-color: var(--bad); }
 .cb .hp-bar { flex-basis: auto; }
@@ -925,6 +929,9 @@ button.cb-pic { cursor: zoom-in; }
       <div class="shelf mini" id="pickShelf" role="group" aria-label="Filter by book" hidden></div>
       <div class="search" style="margin-bottom:10px">
         <input id="pickQ" type="search" placeholder="Search your bestiary…" aria-label="Search monsters" autocomplete="off">
+      </div>
+      <div class="pick-opts">
+        <label class="cb-hide pick-hide"><input type="checkbox" id="pickHidden"> Add as hidden <span class="hint">(players won’t see them until you untick Hidden in the tracker)</span></label>
       </div>
       <p class="hint" style="margin:0;padding-bottom:8px">Tap a monster to add one. Tap again to add another. Each rolls its own initiative.</p>
     </div>
@@ -2783,7 +2790,7 @@ function addPc(name, init, ac) {
   state.enc.list.push({ id: uid(), kind: 'pc', name, init, tie: 0, order: Date.now() + encOrder++, ac: acOrNull(ac) });
   encChanged();
 }
-function addMonsterToFight(m) {
+function addMonsterToFight(m, hidden) {
   const dm = mod(m.dex), roll = die(20), init = roll + dm;
   const same = state.enc.list.filter(c => c.monsterId === m.id);
   let name = m.name;
@@ -2793,8 +2800,8 @@ function addMonsterToFight(m) {
     const nums = same.map(c => +((c.name.match(/(\d+)$/) || [])[1] || 1));
     name = `${m.name} ${Math.max(1, ...nums) + 1}`;
   }
-  state.enc.list.push({ id: uid(), kind: 'monster', monsterId: m.id, name, init, tie: m.dex, order: Date.now() + encOrder++, hp: m.hp, maxHp: m.hp, ac: m.ac });
-  toast(`${name}: rolled ${roll} ${fmt(dm)} = ${init}`);
+  state.enc.list.push({ id: uid(), kind: 'monster', monsterId: m.id, name, init, tie: m.dex, order: Date.now() + encOrder++, hp: m.hp, maxHp: m.hp, ac: m.ac, ...(hidden ? { hidden: true } : {}) });
+  toast(`${name}${hidden ? ' (hidden)' : ''}: rolled ${roll} ${fmt(dm)} = ${init}`);
   encChanged();
 }
 function removeFromFight(id) {
@@ -3218,7 +3225,7 @@ document.addEventListener('click', async ev => {
   if (t.dataset.qb) return toggleQuickBook(t.dataset.qb);
   // initiative tracker
   if (t.dataset.tabGo) return setTab(t.dataset.tabGo);
-  if (t.dataset.pick) { const pm = state.monsters.find(x => x.id === t.dataset.pick); if (pm) { addMonsterToFight(pm); renderPickList(); } return; }
+  if (t.dataset.pick) { const pm = state.monsters.find(x => x.id === t.dataset.pick); if (pm) { addMonsterToFight(pm, $('#pickHidden').checked); renderPickList(); } return; }
   if (t.dataset.cbHp) { state.hpOpen = state.hpOpen === t.dataset.cbHp ? null : t.dataset.cbHp; renderEncounter(); if (state.hpOpen) { const i = document.getElementById('amt-row-' + state.hpOpen); if (i) i.focus(); } return; }
   if (t.dataset.cbDmg) return changeHp(t.dataset.cbDmg, 'dmg', t.closest('.cb-hp').querySelector('input'));
   if (t.dataset.cbHeal) return changeHp(t.dataset.cbHeal, 'heal', t.closest('.cb-hp').querySelector('input'));
@@ -3314,7 +3321,7 @@ document.addEventListener('click', async ev => {
     }
     case 'pc-open': $('#pcName').value = ''; $('#pcInit').value = ''; renderPcSheet(); $('#pcSheet').hidden = false; $('#pcName').focus(); break;
     case 'pc-close': $('#pcSheet').hidden = true; break;
-    case 'pick-open': $('#pickQ').value = ''; renderPickList(); $('#pickSheet').hidden = false; break;
+    case 'pick-open': $('#pickQ').value = ''; $('#pickHidden').checked = false; renderPickList(); $('#pickSheet').hidden = false; break;
     case 'pick-close': $('#pickSheet').hidden = true; break;
     case 'sb-close': $('#sbSheet').hidden = true; state.sheetId = null; break;
     case 'enc-clear':
