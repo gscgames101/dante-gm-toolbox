@@ -463,16 +463,16 @@ button.cb-pic { cursor: zoom-in; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .grp-card-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .prows, .irows { display: grid; gap: 8px; }
-.prow .pac { width: 3.6rem; padding: 6px 4px; text-align: center; font-family: var(--mono); }
+.prow .pac { width: 4.4rem; padding: 6px 4px; text-align: center; font-family: var(--mono); }
 .pc-ac { display: inline-flex; align-items: center; gap: 6px; }
-.cb-ac { width: 3.4rem; height: 30px; padding: 0 4px; text-align: center; font-family: var(--mono); font-weight: 700; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
-#pcAc { width: 4.2em; text-align: center; }
+.cb-ac { width: 4.4rem; height: 30px; padding: 0 4px; text-align: center; font-family: var(--mono); font-weight: 700; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
+#pcAc { width: 4.8em; text-align: center; font-family: var(--mono); }
 /* Player row: picture · Paste · name · AC · remove */
 .prow { display: grid; grid-template-columns: 52px auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .prow .ppaste { min-height: 42px; padding: 0 10px; border-style: dashed; border-color: var(--muted); }
 @media (max-width: 420px) {
   .prow { gap: 6px; padding: 6px; }
-  .prow .pac { width: 2.9rem; }
+  .prow .pac { width: 3.7rem; font-size: .9rem; }
   .prow .ppaste { padding: 0 6px; font-size: .8rem; }
 }
 .prow input { width: 100%; min-height: 42px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-weight: 700; }
@@ -936,7 +936,7 @@ button.cb-pic { cursor: zoom-in; }
     <form class="add-pc" id="pcForm" autocomplete="off">
       <input id="pcName" placeholder="Player name" aria-label="Player name" maxlength="40">
       <input id="pcInit" type="number" placeholder="Init" aria-label="Initiative" min="-10" max="50">
-      <input id="pcAc" type="number" inputmode="numeric" placeholder="AC" aria-label="Armor Class" min="0" max="40">
+      <input id="pcAc" type="text" placeholder="AC" aria-label="Armor Class, for example 16 or 16/18" maxlength="8" autocomplete="off">
       <button class="btn primary" type="submit">Add</button>
     </form>
     <p class="hint" style="margin:8px 0 0">Add as many as you need, then tap Done.</p>
@@ -2845,7 +2845,7 @@ function cbRow(c, current) {
     ${cbPic(c)}
     <div class="cb-main">
       <div class="cb-name">${esc(c.name)}${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}</div>
-      ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="number" inputmode="numeric" min="0" max="40" value="${c.ac != null ? +c.ac : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
+      ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="text" maxlength="8" autocomplete="off" value="${c.ac != null ? esc(String(c.ac)) : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
       ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button></div>
       <div class="hp-bar"><i class="${hpLow(c) ? 'low' : ''}" style="width:${pct}%"></i></div>` : ''}
     </div>
@@ -2969,8 +2969,12 @@ function showConfirm(msg, yesLabel, fn) {
 /* ---------- player groups ---------- */
 // Saved parties (groups/<id>: {name, players:[{id, name, image, thumb}]}), added to a fight in one go.
 state.groups = []; state.grp = null; state.grpUploaded = []; state.grpPicFor = null; state.grpInitFor = null;
-// A player's Armor Class: a whole number 0–40, or null when not set.
-const acOrNull = v => { const n = intOrNull(v); return n == null ? null : Math.max(0, Math.min(40, n)); };
+// A player's Armor Class as text: one number, or a few joined by "/" (e.g. "16/18" with and without a shield).
+// Keeps only digits and slashes, each number 0–40, up to three of them; null when empty.
+const acOrNull = v => {
+  const parts = String(v == null ? '' : v).split('/').map(x => x.replace(/\D/g, '')).filter(Boolean).slice(0, 3);
+  return parts.length ? parts.map(n => String(Math.min(40, +n))).join('/') : null;
+};
 const cleanPlayers = a => (Array.isArray(a) ? a : []).filter(p => p && str(p.name)).map(p => ({
   id: /^[A-Za-z0-9_-]{1,40}$/.test(str(p.id)) ? str(p.id) : uid(), name: str(p.name).slice(0, 40),
   ac: acOrNull(p.ac),
@@ -3021,7 +3025,7 @@ function renderGrpPlayers() {
       <button type="button" class="ppic${isAssetId(p.image) ? ' has' : ''}" data-ppic="${esc(p.id)}" aria-label="Picture for ${esc(p.name || 'this player')}">${p.uploading ? '…' : isAssetId(p.image) ? `<img src="${imgSrc(isAssetId(p.thumb) ? p.thumb : p.image)}" alt="">` : 'Add<br>picture'}</button>
       <button type="button" class="btn small ppaste" data-ppaste="${esc(p.id)}" aria-label="Paste a copied picture for ${esc(p.name || 'this player')}"${p.uploading ? ' disabled' : ''}>Paste</button>
       <input id="pn-${esc(p.id)}" value="${esc(p.name)}" placeholder="Player name" aria-label="Player name" maxlength="40">
-      <input class="pac" id="pa-${esc(p.id)}" type="number" inputmode="numeric" min="0" max="40" value="${p.ac != null ? +p.ac : ''}" placeholder="AC" aria-label="Armor Class for ${esc(p.name || 'this player')}">
+      <input class="pac" id="pa-${esc(p.id)}" type="text" maxlength="8" autocomplete="off" value="${p.ac != null ? esc(String(p.ac)) : ''}" placeholder="AC" aria-label="Armor Class for ${esc(p.name || 'this player')}">
       <button type="button" class="btn small ghost" data-prm="${esc(p.id)}" aria-label="Remove player">✕</button>
     </div>`).join('');
 }
