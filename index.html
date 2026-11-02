@@ -361,7 +361,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 /* Tabs + initiative tracker */
 .app[data-tab="init"] .panes, .app[data-tab="init"] #newBtn { display: none; }
 .app[data-tab="bestiary"] .initview { display: none; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); background: var(--bg); }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--bg); }
 .tabs button { min-height: 46px; border: 0; background: transparent; font-weight: 700; color: var(--muted); border-top: 3px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tabs button[aria-pressed="true"] { color: var(--accent); border-top-color: var(--accent); }
 .tab-badge { font-family: var(--mono); font-size: .72rem; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
@@ -501,13 +501,64 @@ button.cb-pic { cursor: zoom-in; }
 .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: .9rem; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { .pop { animation: none; } .hp-bar i { transition: none; } }
 
+/* ---------- Maps tab ---------- */
+.app[data-tab="maps"] .panes, .app[data-tab="maps"] .initview, .app[data-tab="maps"] #newBtn { display: none; }
+.app:not([data-tab="maps"]) .mapsview { display: none; }
+.mapsview { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; }
+.mapsview[data-mview="list"] .map-pane { display: none; }
+.mapsview[data-mview="map"] .map-list-pane { display: none; }
+@media (min-width: 820px) {
+  .mapsview { grid-template-columns: minmax(280px, 340px) 1fr; }
+  .mapsview[data-mview] .map-list-pane { display: block; border-right: 1px solid var(--line); }
+  .mapsview[data-mview] .map-pane { display: flex; }
+  .map-back { display: none !important; }
+}
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding-bottom: 20px; }
+.map-card { position: relative; display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: left; min-width: 0; }
+.map-card:hover { border-color: var(--muted); }
+.map-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.map-card .mthumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; background: var(--sunk); display: block; }
+.map-card .nm { font-weight: 700; font-size: .92rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-card .fl { font-size: .76rem; color: var(--muted); display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.map-card .fl::before { content: ""; flex: none; width: 8px; height: 11px; border-radius: 1px 2px 2px 1px; background: var(--book, var(--line)); }
+.map-card .live-tag { position: absolute; top: 10px; left: 10px; }
+.live-tag { font-size: .7rem; font-weight: 700; letter-spacing: .08em; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.map-pane { flex-direction: column; min-height: 0; overflow: hidden; display: flex; }
+.map-placeholder { padding: 48px 24px; color: var(--muted); }
+.map-work { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.map-work[hidden] { display: none; }
+.map-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 10px 6px; }
+.map-bar h2 { flex: 1; min-width: 6em; font-family: var(--display); font-weight: 400; font-size: 1.35rem; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
+.map-colors { display: flex; gap: 5px; flex-wrap: wrap; }
+.map-colors button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
+.map-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.color-pick { display: inline-flex; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; border: 1px solid var(--line); cursor: pointer; }
+.color-pick input { width: 44px; height: 44px; margin: -7px; border: 0; padding: 0; cursor: pointer; background: none; }
+.map-stage { position: relative; flex: 1; min-height: 260px; overflow: hidden; background: var(--sunk); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.map-stage.drawing { cursor: crosshair; }
+.map-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.map-canvas img, .map-canvas svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.map-canvas .dmonly { opacity: .55; }
+/* Players' screen: Initiative / Map switch, and the map filling the screen */
+.pv-switch { display: flex; justify-content: center; padding-top: 12px; }
+.pv-switch .seg button { min-height: 40px; padding: 0 18px; font-size: .9rem; }
+.app[data-role="player"] main.player-view.map-mode { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 12px; }
+.player-view.map-mode .pv-wrap { display: none; }
+.pv-map { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
+.pv-map .map-stage { border-radius: var(--radius); border: 1px solid var(--line); }
+.pv-map-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pv-map-bar b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--accent); }
+.pv-map-bar .hint { flex: 1; min-width: 10em; }
+.pv-pin-note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--accent); white-space: pre-line; }
+
 /* Big screens (laptops, desktop monitors, TVs): wider columns, centred bars, and stat blocks in two columns like the books. */
 @media (min-width: 1100px) {
   .panes { grid-template-columns: clamp(340px, 26vw, 560px) 1fr; }
   .initview { grid-template-columns: clamp(380px, 32vw, 680px) 1fr; }
   .detail-wrap { max-width: 1240px; }
   .detail-wrap .sb, .detail-wrap .notes, .cb-card { max-width: none; }
-  .tabs { grid-template-columns: repeat(2, minmax(0, 340px)); justify-content: center; }
+  .tabs { grid-template-columns: repeat(3, minmax(0, 300px)); justify-content: center; }
   .sheet-in { max-width: 960px; }
   /* Players' screen: no rolls yet = one centred column; with rolls = turn order on the left,
      latest + earlier rolls stacked on the right ("dense" lets the list fill the left beside them). */
@@ -597,7 +648,72 @@ button.cb-pic { cursor: zoom-in; }
     </section>
   </main>
 
+  <main class="mapsview" id="mapsView" data-mview="list" aria-label="Maps">
+    <section class="pane gutter map-list-pane" id="mapListPane" aria-label="Map list">
+      <div class="shelf" id="mapShelf" role="group" aria-label="Map folders"></div>
+      <div class="list-tools">
+        <div class="book-bar" id="mapFolderBar" hidden></div>
+        <div class="search">
+          <input id="mapQ" type="search" placeholder="Search maps…" aria-label="Search maps" autocomplete="off">
+          <label class="btn primary file-btn" id="mapNewBtn" for="mapFile"><span>+ New map</span><input id="mapFile" type="file" accept="image/*"></label>
+        </div>
+        <p class="hint" id="mapUploadMsg" style="margin:0" hidden></p>
+      </div>
+      <div class="map-grid" id="mapGrid"></div>
+      <div class="empty" id="mapEmpty" hidden></div>
+    </section>
+    <section class="map-pane" id="mapPane" aria-label="Map">
+      <div class="map-placeholder" id="mapPlaceholder"><p>Pick a map from the list, or add one with <b>+ New map</b>.</p></div>
+      <div class="map-work" id="mapWork" hidden>
+        <div class="map-bar gutter">
+          <button type="button" class="btn small ghost map-back" data-act="map-back">← Maps</button>
+          <h2 id="mapTitle"></h2>
+          <span class="live-tag" id="mapLive" hidden>LIVE</span>
+          <button type="button" class="btn small ghost" data-act="map-details">Details</button>
+          <button type="button" class="btn small ghost danger" data-act="map-stop" id="mapStopBtn" hidden>Stop showing</button>
+          <button type="button" class="btn small primary" data-act="map-send" id="mapSendBtn">Send to players</button>
+        </div>
+        <div class="map-tools gutter" id="mapTools" role="toolbar" aria-label="Map tools">
+          <div class="seg" role="group" aria-label="Tool">
+            <button type="button" data-mtool="move" aria-pressed="true" title="Drag to move, scroll or pinch to zoom. Tap a pin or text to edit it.">Move</button>
+            <button type="button" data-mtool="pin" aria-pressed="false" title="Tap the map to drop a pin with a note">Pin</button>
+            <button type="button" data-mtool="pen" aria-pressed="false" title="Draw lines">Pen</button>
+            <button type="button" data-mtool="paint" aria-pressed="false" title="See-through brush to colour areas">Paint</button>
+            <button type="button" data-mtool="text" aria-pressed="false" title="Tap the map to write text">Text</button>
+            <button type="button" data-mtool="erase" aria-pressed="false" title="Tap a mark to delete it">Erase</button>
+          </div>
+          <div class="map-colors" id="mapColors" role="radiogroup" aria-label="Colour"></div>
+          <label class="color-pick" title="Pick any colour"><input type="color" id="mapColorPick" value="#e2463a" aria-label="Pick any colour"></label>
+          <div class="seg" role="group" aria-label="Size">
+            <button type="button" data-msize="s" aria-pressed="false">S</button>
+            <button type="button" data-msize="m" aria-pressed="true">M</button>
+            <button type="button" data-msize="l" aria-pressed="false">L</button>
+          </div>
+          <div class="seg" role="group" aria-label="Who sees new marks">
+            <button type="button" data-mvis="all" aria-pressed="true">Players see</button>
+            <button type="button" data-mvis="dm" aria-pressed="false">DM only</button>
+          </div>
+          <button type="button" class="btn small ghost" data-act="map-undo" id="mapUndo" disabled>↶ Undo</button>
+          <button type="button" class="btn small ghost" data-act="map-fit">Fit</button>
+        </div>
+        <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+      </div>
+    </section>
+  </main>
+
   <main class="pane gutter player-view" id="playerView" aria-label="Initiative order">
+    <div class="pv-switch" id="pvSwitch" hidden>
+      <div class="seg" role="group" aria-label="What to show">
+        <button type="button" data-pvtab="init" aria-pressed="true">Initiative</button>
+        <button type="button" data-pvtab="map" aria-pressed="false">Map</button>
+      </div>
+    </div>
+    <section class="pv-map" id="pvMap" hidden>
+      <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+      <div class="pv-map-bar"><b id="pvMapName"></b><span class="hint">Drag to move · pinch or scroll to zoom · tap a pin to read it</span><button type="button" class="btn small" data-act="pv-fit">Fit</button></div>
+      <p class="pv-pin-note" id="pvPinNote" hidden></p>
+      <div class="empty" id="pvMapEmpty" hidden><h3>No map right now</h3><p>Your DM isn’t showing a map at the moment.</p></div>
+    </section>
     <div class="pv-wrap">
       <div class="pv-banner" id="pvBanner" hidden>
         <span>This is what your players see.</span>
@@ -623,6 +739,7 @@ button.cb-pic { cursor: zoom-in; }
   <nav class="tabs gutter" aria-label="Sections">
     <button data-tab-go="bestiary" aria-pressed="true">Bestiary</button>
     <button data-tab-go="init" aria-pressed="false">Initiative <span class="tab-badge" id="encBadge" hidden></span></button>
+    <button data-tab-go="maps" aria-pressed="false">Maps <span class="tab-badge" id="mapBadge" hidden>LIVE</span></button>
   </nav>
 
   <footer class="tray gutter" id="tray">
@@ -890,6 +1007,60 @@ button.cb-pic { cursor: zoom-in; }
         <span style="flex:1"></span>
         <button type="button" class="btn" data-act="book-cancel">Cancel</button>
         <button type="submit" class="btn primary" id="bookSave">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet dim" id="folderSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box book-dlg" id="folderForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h" id="folderDlgTitle">New folder</h3>
+      <div class="field"><label for="folderName">Folder name</label><input id="folderName" maxlength="40" placeholder="Curse of Strahd"></div>
+      <div class="field"><span class="lbl">Colour</span><div class="swatches" id="folderColors" role="radiogroup" aria-label="Folder colour"></div></div>
+      <p class="err" id="folderErr" hidden></p>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="folder-delete" id="folderDel">Delete folder</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="folder-cancel">Cancel</button>
+        <button type="submit" class="btn primary" id="folderSave">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet dim" id="mapDetSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box" id="mapDetForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h">Map details</h3>
+      <div class="field"><label for="mapDetName">Name</label><input id="mapDetName" maxlength="60"></div>
+      <div class="field"><label for="mapDetFolder">Folder</label><select id="mapDetFolder"></select></div>
+      <p class="err" id="mapDetErr" hidden></p>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="map-delete">Delete map</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="mapdet-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet dim" id="markSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box" id="markForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h" id="markTitle">Pin</h3>
+      <div class="field"><label for="markText" id="markTextLbl">Label</label><input id="markText" maxlength="80"></div>
+      <div class="field" id="markNoteField"><label for="markNote">Note (optional)</label><textarea id="markNote" rows="3" maxlength="600"></textarea></div>
+      <div class="seg" role="group" aria-label="Who sees it">
+        <button type="button" data-markvis="all" aria-pressed="true">Players see</button>
+        <button type="button" data-markvis="dm" aria-pressed="false">DM only</button>
+      </div>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="mark-delete" id="markDel">Delete</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="mark-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
       </div>
     </form>
   </div>
@@ -2427,15 +2598,16 @@ async function exportForSite() {
     const ids = new Set(), add = v => { if (isAssetId(v)) ids.add(v); };
     state.monsters.forEach(m => { add(m.image); add(m.thumb); });
     state.groups.forEach(g => (g.players || []).forEach(p => { add(p.image); add(p.thumb); }));
+    state.maps.forEach(m => { add(m.image); add(m.thumb); });
     const assets = {}; let i = 0, missing = 0;
     for (const id of ids) {
       siteMsg('#siteExportMsg', `Packing pictures… ${++i} of ${ids.size}`);
       try { assets[id] = await picData(id); } catch { missing++; }
     }
-    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, assets };
+    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, assets };
     const json = JSON.stringify(data);
     const name = `dante-gm-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
-    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
+    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
     if (SITE) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = name;
@@ -2471,10 +2643,11 @@ async function importFile(file) {
   }
   if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
   const monsters = data.monsters.filter(m => m && m.id && m.name), books = (data.books || []).filter(b => b && b.id && b.name), groups = (data.groups || []).filter(g => g && g.id);
+  const mapFolders = (data.mapFolders || []).filter(f => f && f.id && f.name), maps = (data.maps || []).filter(m => m && m.id && isAssetId(m.image));
   const assets = Object.entries(data.assets || {}).filter(([id, d]) => isAssetId(id) && typeof d === 'string' && d.startsWith('data:image/'));
-  const what = `${monsters.length} monsters, ${books.length} books, ${groups.length} groups and ${assets.length} pictures`;
-  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets));
-  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets));
+  const what = `${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${maps.length} maps and ${assets.length} pictures`;
+  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps));
+  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps));
 }
 /* A monster in an import file can name its books ("books": ["WOW"]): it's filed in the book with that name,
    which is created if this bestiary doesn't have it yet. */
@@ -2506,7 +2679,7 @@ async function addMonsterList(list) {
 }
 /* claude.ai app: add and update from the file, never delete. Pictures the app already has are reused;
    the rest are uploaded and the monsters point at the new copies. */
-async function mergeFromFile(monsters, books, groups, assets) {
+async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], maps = []) {
   const db = state.db, input = $('#siteImportFile'); input.disabled = true;
   try {
     const map = {}; let i = 0;
@@ -2523,28 +2696,36 @@ async function mergeFromFile(monsters, books, groups, assets) {
       ...books.map(({ id, ...b }) => () => db.collection('books').doc(id).set({ name: b.name, color: b.color, createdAt: b.createdAt || Date.now() })),
       ...groups.map(({ id, ...g }) => () => db.collection('groups').doc(id).set({ name: g.name, createdAt: g.createdAt || Date.now(),
         players: cleanPlayers((g.players || []).map(p => ({ ...p, image: fix(p.image), thumb: fix(p.thumb) }))) })),
-      ...monsters.map(({ id, ...m }) => () => db.collection('monsters').doc(id).set(normalize({ ...m, image: fix(m.image), thumb: fix(m.thumb) })))
+      ...monsters.map(({ id, ...m }) => () => db.collection('monsters').doc(id).set(normalize({ ...m, image: fix(m.image), thumb: fix(m.thumb) }))),
+      ...mapFolders.map(({ id, ...f }) => () => db.collection('mapFolders').doc(id).set({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() })),
+      ...maps.filter(m => fix(m.image)).map(({ id, ...m }) => () => db.collection('maps').doc(id).set({
+        name: str(m.name) || 'Map', folderId: m.folderId || null, image: fix(m.image), thumb: fix(m.thumb) || '',
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), createdAt: m.createdAt || Date.now() }))
     ];
     let done = 0; const total = jobs.length;
     const worker = async () => { for (let j; (j = jobs.shift());) { await j(); siteMsg('#siteImportMsg', `Saving… ${++done} of ${total}`); } };
     await Promise.all([worker(), worker(), worker(), worker()]);
-    siteMsg('#siteImportMsg', `Done: ${monsters.length} monsters, ${books.length} books, ${groups.length} groups.`);
+    siteMsg('#siteImportMsg', `Done: ${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${maps.length} maps.`);
     toast('Import finished');
   } catch (e) {
     siteMsg('#siteImportMsg', `The import stopped partway. ${saveErrorText(e)} Choose the file again to finish.`, true);
   } finally { input.disabled = false; }
 }
 /* Website: make it match the file exactly (it's a copy of the claude.ai app). */
-function replaceFromFile(monsters, books, groups, assets) {
+function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps = []) {
   return (async () => {
     const db = state.db, input = $('#siteImportFile'); input.disabled = true;
     try {
       // pictures first, a few at a time, so monsters never point at a missing picture
       let done = 0;
       const queue = assets.slice();
-      const worker = async () => { for (let a; (a = queue.shift());) { await SITE.putAsset(a[0], a[1]); siteMsg('#siteImportMsg', `Uploading pictures… ${++done} of ${assets.length}`); } };
+      const mapPics = new Set(maps.map(m => m.image));  // map pictures keep full quality (stored in pieces)
+      const worker = async () => { for (let a; (a = queue.shift());) {
+        await (mapPics.has(a[0]) && SITE.putAssetLarge ? SITE.putAssetLarge(a[0], a[1]) : SITE.putAsset(a[0], a[1]));
+        siteMsg('#siteImportMsg', `Uploading pictures… ${++done} of ${assets.length}`);
+      } };
       await Promise.all([worker(), worker(), worker(), worker()]);
-      siteMsg('#siteImportMsg', 'Saving monsters, books and groups…');
+      siteMsg('#siteImportMsg', 'Saving monsters, books, groups and maps…');
       const ops = [];
       const mirror = (col, list, have, toDoc) => {
         const keep = new Set(list.map(x => x.id));
@@ -2554,10 +2735,13 @@ function replaceFromFile(monsters, books, groups, assets) {
       mirror('books', books, state.books, ({ id, ...b }) => b);
       mirror('groups', groups, state.groups, ({ id, ...g }) => ({ name: g.name, players: cleanPlayers(g.players), createdAt: g.createdAt || Date.now() }));
       mirror('monsters', monsters, state.monsters, ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
-      for (let i = 0; i < ops.length; i += 400) {
-        const b = db.batch(); ops.slice(i, i + 400).forEach(f => f(b)); await b.commit();
+      mirror('mapFolders', mapFolders, state.mapFolders, ({ id, ...f }) => ({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() }));
+      mirror('maps', maps, state.maps, ({ id, ...m }) => ({ name: str(m.name) || 'Map', folderId: m.folderId || null, image: m.image, thumb: m.thumb || '',
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), createdAt: m.createdAt || Date.now() }));
+      for (let i = 0; i < ops.length; i += 100) {  // map documents can be large, so smaller batches
+        const b = db.batch(); ops.slice(i, i + 100).forEach(f => f(b)); await b.commit();
       }
-      siteMsg('#siteImportMsg', `Done: ${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${assets.length} pictures.`);
+      siteMsg('#siteImportMsg', `Done: ${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${maps.length} maps, ${assets.length} pictures.`);
       toast('Bestiary brought in from the app');
     } catch (e) {
       siteMsg('#siteImportMsg', `The import stopped partway (${(e && (e.code || e.message)) || 'unknown error'}). Choose the file again to finish.`, true);
@@ -2682,7 +2866,7 @@ async function publishPlayers() {
   try {
     setSync('Updating players…', 'idle');
     stashScreen();
-    await state.artifact.publish(buildPage({ ...publicEnc(), at: Date.now() }));
+    await state.artifact.publish(buildPage({ ...publicEnc(), map: publicMap(), at: Date.now() }));
   } catch (e) {
     const c = e && e.code;
     ss.del('pb-screen');
@@ -2780,9 +2964,12 @@ function showPlayers() {
     $('#pvSignin').hidden = location.hash === '#players';
     renderPlayerView(null);
     SITE.watchPlayers(d => renderPlayerView(d));
+    if (SITE.watchMap) SITE.watchMap(d => setPvMap(d && d.map));
     return;
   }
-  renderPlayerView(readPub());
+  const pub = readPub();
+  renderPlayerView(pub);
+  setPvMap(pub && pub.map);
 }
 function setRole(r) {
   state.role = r;
@@ -3026,6 +3213,7 @@ function setTab(tab) {
   document.querySelectorAll('[data-tab-go]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tabGo === tab)));
   ls.set('pb-tab', tab);
   if (tab === 'init') renderEncounter();
+  if (tab === 'maps') { renderMaps(); requestAnimationFrame(() => dmViewer && curMap() && dmViewer.fit()); }
 }
 function showConfirm(msg, yesLabel, fn) {
   $('#confirmMsg').textContent = msg; $('#confirmYes').textContent = yesLabel;
@@ -3264,6 +3452,16 @@ document.addEventListener('click', async ev => {
   if (t.dataset.book) { state.book = t.dataset.book; ls.set('pb-book', state.book); renderList(); $('#listPane').scrollTop = 0; return; }
   if (t.dataset.bk) { t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true')); return; }
   if (t.dataset.ppaste) { pastePlayerPic(t.dataset.ppaste, t); return; }
+  // maps
+  if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListPane').scrollTop = 0; return; }
+  if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
+  if (t.dataset.mtool) { state.mapTool = t.dataset.mtool; renderMapWork(); return; }
+  if (t.dataset.msize) { state.mapSize = t.dataset.msize; renderMapWork(); return; }
+  if (t.dataset.mvis) { state.mapVis = t.dataset.mvis; renderMapWork(); return; }
+  if (t.dataset.mcolor) { state.mapColor = t.dataset.mcolor; $('#mapColorPick').value = t.dataset.mcolor; renderMapWork(); return; }
+  if (t.dataset.fcolor) { state.folderColor = t.dataset.fcolor; renderFolderColors(); return; }
+  if (t.dataset.markvis) { state.markVis = t.dataset.markvis; document.querySelectorAll('[data-markvis]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.markvis === state.markVis))); return; }
+  if (t.dataset.pvtab) { state.pvTab = t.dataset.pvtab; $('#pvPinNote').hidden = true; renderPvTab(); return; }
   if (t.dataset.pickbook) { state.pickBook = t.dataset.pickbook; renderPickList(); $('#pickSheet').scrollTop = 0; return; }
   if (t.dataset.bcolor) { state.bookColor = t.dataset.bcolor; renderBookColors(); return; }
   if (t.dataset.fs) {
@@ -3320,6 +3518,36 @@ document.addEventListener('click', async ev => {
       $('#pvLink').value = SITE ? location.origin + location.pathname + '#players' : PLAYER_URL;
       if (SITE) $('#pvSteps').innerHTML = '<li>Send players the link below. They don’t need an account.</li><li>Their screen changes by itself the moment you press <b>Start</b>, <b>Next</b> or <b>Prev</b>, or roll from a monster’s stat block.</li>';
       $('#pvSheet').hidden = false; break;
+    case 'folder-new': openFolderDlg(null); break;
+    case 'folder-edit': { const f = state.mapFolders.find(x => x.id === state.mapFolder); if (f) openFolderDlg(f); break; }
+    case 'folder-cancel': $('#folderSheet').hidden = true; break;
+    case 'folder-delete': {
+      const f = state.mapFolders.find(x => x.id === state.folderEditing); if (!f) break;
+      $('#folderSheet').hidden = true;
+      const n = state.maps.filter(m => m.folderId === f.id).length;
+      showConfirm(`Delete the folder “${f.name}”?${n ? ` Its ${n} map${n === 1 ? '' : 's'} stay, with no folder.` : ''}`, 'Delete folder', () => deleteFolder(f.id));
+      break;
+    }
+    case 'map-back': $('#mapsView').dataset.mview = 'list'; renderMaps(); break;
+    case 'map-details': openMapDetails(); break;
+    case 'mapdet-cancel': $('#mapDetSheet').hidden = true; break;
+    case 'map-delete': {
+      const m = curMap(); if (!m) break;
+      $('#mapDetSheet').hidden = true;
+      showConfirm(`Delete the map “${m.name}” and all its marks? This can’t be undone.`, 'Delete map', () => deleteMap(m.id));
+      break;
+    }
+    case 'map-send': sendMapToPlayers(); break;
+    case 'map-stop': stopShowingMap(); break;
+    case 'map-undo': undoMarks(); break;
+    case 'map-fit': if (dmViewer) dmViewer.fit(); break;
+    case 'mark-cancel': $('#markSheet').hidden = true; state.markEditing = null; break;
+    case 'mark-delete': {
+      const ed = state.markEditing; $('#markSheet').hidden = true; state.markEditing = null;
+      if (ed && !ed.isNew) changeMarks(marks => marks.filter(x => x.id !== ed.mark.id));
+      break;
+    }
+    case 'pv-fit': if (pvViewer) pvViewer.fit(); break;
     case 'dm-signin': SITE.signIn().catch(() => toast('Sign-in didn’t finish. Try again.')); break;
     case 'dm-signout': SITE.signOut(); break;
     case 'site-export': exportForSite(); break;
@@ -3330,8 +3558,8 @@ document.addEventListener('click', async ev => {
       catch { inp.focus(); inp.select(); toast('Selected. Copy it with your device’s copy command.'); }
       break;
     }
-    case 'pv-preview': $('#pvSheet').hidden = true; state.previewPlayer = true; setRole('player'); renderPlayerView(publicEnc()); break;
-    case 'pv-exit': state.previewPlayer = false; setRole('dm'); setTab('init'); break;
+    case 'pv-preview': $('#pvSheet').hidden = true; state.previewPlayer = true; setRole('player'); renderPlayerView(publicEnc()); setPvMap(publicMap()); break;
+    case 'pv-exit': state.previewPlayer = false; $('#playerView').classList.remove('map-mode'); setRole('dm'); setTab('init'); break;
     case 'book-new': openBookDlg(null); break;
     case 'book-edit': { const b = state.books.find(x => x.id === state.book); if (b) openBookDlg(b); break; }
     case 'book-cancel': $('#bookSheet').hidden = true; if (state.quickFor) $('#qbSheet').hidden = false; break;
@@ -3558,7 +3786,499 @@ document.addEventListener('wheel', e => {
 // Max HP box in the tracker's HP panels (row, side panel and phone sheet).
 document.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.cbMax) setMaxHp(e.target.dataset.cbMax, e.target.value); });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.cbMax) e.target.blur(); });
+// Maps tab
+$('#folderForm').addEventListener('submit', saveFolder);
+$('#mapDetForm').addEventListener('submit', saveMapDetails);
+$('#markForm').addEventListener('submit', saveMarkDlg);
+$('#mapFile').addEventListener('change', e => addMapFromFile(e.target.files && e.target.files[0]));
+$('#mapQ').addEventListener('input', renderMaps);
+$('#mapColorPick').addEventListener('input', e => { state.mapColor = e.target.value; renderMapWork(); });
+document.addEventListener('keydown', e => {
+  // Ctrl/Cmd+Z undoes the last mark while drawing on a map
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && $('#app').dataset.tab === 'maps' && state.role === 'dm'
+      && !e.target.closest('input, textarea, select, [contenteditable]') && document.querySelectorAll('.sheet:not([hidden])').length === 0) { e.preventDefault(); undoMarks(); }
+});
 $('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
+
+/* ---------- maps ---------- */
+// Folders (mapFolders/<id>: {name, color}) hold maps (maps/<id>: {name, folderId, image, thumb, w, h, marks, createdAt}).
+// A map is in one folder (or none). Marks are in image pixels:
+//   {id, k: 'pin'|'pen'|'paint'|'text', c: colour, vis: 'all'|'dm', x, y, p: [x, y, x, y, …], s: size, t: text, n: note}
+// The map shown to players goes out as public/map on the website (live) and inside the player page on claude.ai.
+const MAP_COLORS = ['#e2463a', '#f0a020', '#f5e04a', '#3fae5a', '#2f8fd8', '#8e5bd8', '#ffffff', '#111111'];
+Object.assign(state, {
+  maps: [], mapFolders: [], mapFolder: 'all', mapId: null, mapTool: 'move', mapColor: '#e2463a', mapSize: 'm', mapVis: 'all',
+  mapUndo: [], shownMap: null, folderEditing: null, folderColor: 'oxblood', markEditing: null, markVis: 'all',
+  pvTab: 'init', pvMapData: null
+});
+let mapSaveT = null, mapDirtyId = null, mapPushT = null, dmViewer = null, pvViewer = null;
+const mapBase = m => Math.max(m.w || 1000, m.h || 1000) / 1000;      // 1 "unit" ≈ 0.1% of the map's long side
+const curMap = () => state.maps.find(m => m.id === state.mapId) || null;
+const folderOf = m => state.mapFolders.find(f => f.id === m.folderId) || null;
+const sortedFolders = () => [...state.mapFolders].sort((a, b) => a.name.localeCompare(b.name));
+const cleanMarks = a => (Array.isArray(a) ? a : []).filter(k => k && k.id && ['pin', 'pen', 'paint', 'text'].includes(k.k));
+
+/* --- folder shelf + list --- */
+function renderMaps() {
+  if (state.mapFolder !== 'all' && !state.mapFolders.some(f => f.id === state.mapFolder)) state.mapFolder = 'all';
+  const tile = (id, name, count, style, cls) =>
+    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-mfolder="${esc(id)}" aria-pressed="${state.mapFolder === id}"${style ? ` style="--book:${style}"` : ''} aria-label="${esc(name)}, ${count} map${count === 1 ? '' : 's'}">
+      <span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
+  $('#mapShelf').innerHTML = tile('all', 'All maps', state.maps.length, '', 'book-all')
+    + sortedFolders().map(f => tile(f.id, f.name, state.maps.filter(m => m.folderId === f.id).length, BOOK_COLORS[f.color] || BOOK_COLORS.oxblood)).join('')
+    + (state.canWrite ? `<button type="button" class="book book-new" data-act="folder-new">+ New folder</button>` : '');
+  const cur = state.mapFolders.find(f => f.id === state.mapFolder), bar = $('#mapFolderBar');
+  bar.hidden = !cur;
+  bar.innerHTML = cur ? `<b>${esc(cur.name)}</b><span>${state.maps.filter(m => m.folderId === cur.id).length} maps</span><span class="spacer"></span>
+    ${state.canWrite ? `<button type="button" class="btn small ghost" data-act="folder-edit">Edit folder</button>` : ''}` : '';
+  $('#mapNewBtn').hidden = !state.canWrite || !state.assets;
+  const q = str($('#mapQ').value).toLowerCase();
+  const list = state.maps.filter(m => (state.mapFolder === 'all' || m.folderId === state.mapFolder) && (!q || m.name.toLowerCase().includes(q)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const shown = state.shownMap && state.shownMap.id;
+  $('#mapGrid').innerHTML = list.map(m => {
+    const f = folderOf(m);
+    return `<button type="button" class="map-card${m.id === state.mapId ? ' on' : ''}" data-mapopen="${esc(m.id)}">
+      ${isAssetId(m.thumb || m.image) ? `<img class="mthumb" src="${imgSrc(m.thumb || m.image)}" alt="" loading="lazy" decoding="async">` : '<span class="mthumb"></span>'}
+      ${m.id === shown ? '<span class="live-tag">LIVE</span>' : ''}
+      <span class="nm">${esc(m.name)}</span>
+      <span class="fl" style="--book:${f ? BOOK_COLORS[f.color] || BOOK_COLORS.oxblood : 'var(--line)'}">${f ? esc(f.name) : 'No folder'}</span>
+    </button>`;
+  }).join('');
+  const empty = $('#mapEmpty');
+  empty.hidden = list.length > 0;
+  empty.innerHTML = state.maps.length
+    ? '<p>No maps here yet.</p>'
+    : '<h3>No maps yet</h3><p>Tap <b>+ New map</b> and pick a picture of a map. You can sort maps into folders, draw on them, and show them to your players.</p>';
+  $('#mapBadge').hidden = !shown;
+  renderMapWork();
+}
+
+/* --- folders (like monster books, but a map lives in one folder) --- */
+function openFolderDlg(folder) {
+  state.folderEditing = folder ? folder.id : null;
+  state.folderColor = folder && BOOK_COLORS[folder.color] ? folder.color : Object.keys(BOOK_COLORS)[state.mapFolders.length % 8];
+  $('#folderDlgTitle').textContent = folder ? 'Edit folder' : 'New folder';
+  $('#folderName').value = folder ? folder.name : '';
+  $('#folderDel').hidden = !folder; $('#folderErr').hidden = true;
+  renderFolderColors();
+  $('#folderSheet').hidden = false; $('#folderName').focus();
+}
+function renderFolderColors() {
+  $('#folderColors').innerHTML = Object.entries(BOOK_COLORS).map(([k, v]) =>
+    `<button type="button" role="radio" data-fcolor="${k}" aria-checked="${state.folderColor === k}" aria-label="${k}" style="--sw:${v}"></button>`).join('');
+}
+async function saveFolder(e) {
+  e.preventDefault();
+  const name = str($('#folderName').value).slice(0, 40);
+  if (!name) { showErr('#folderErr', 'Give the folder a name.'); return; }
+  if (!state.db) { showErr('#folderErr', 'Not connected, so the folder can’t be saved right now.'); return; }
+  const old = state.mapFolders.find(f => f.id === state.folderEditing);
+  const ref = old ? state.db.collection('mapFolders').doc(old.id) : state.db.collection('mapFolders').doc();
+  try {
+    await ref.set({ name, color: state.folderColor, createdAt: old ? old.createdAt || Date.now() : Date.now() });
+    if (!old) { if (!state.mapFolders.some(f => f.id === ref.id)) state.mapFolders.push({ id: ref.id, name, color: state.folderColor }); state.mapFolder = ref.id; }
+    $('#folderSheet').hidden = true; toast(old ? 'Folder saved' : `Created “${name}”`); renderMaps();
+  } catch (err) { showErr('#folderErr', saveErrorText(err)); }
+}
+async function deleteFolder(id) {
+  const f = state.mapFolders.find(x => x.id === id); if (!f || !state.db) return;
+  try {
+    for (const m of state.maps.filter(x => x.folderId === id)) { await state.db.collection('maps').doc(m.id).update({ folderId: null }); m.folderId = null; }
+    await state.db.collection('mapFolders').doc(id).delete();
+    state.mapFolders = state.mapFolders.filter(x => x.id !== id); state.mapFolder = 'all';
+    toast(`Deleted “${f.name}”. Its maps are kept, with no folder.`); renderMaps();
+  } catch (err) { toast(saveErrorText(err)); }
+}
+
+/* --- adding a map: full quality (up to ~8 MB on the website, ~19 MB on claude.ai) --- */
+async function prepareMap(file) {
+  const limit = SITE ? 8e6 : 19e6;
+  const bmp = await decodeImage(file);
+  const w0 = bmp.width, h0 = bmp.height;
+  if (file.size <= limit && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return { blob: file, w: w0, h: h0 };
+  let scale = Math.min(1, 8192 / Math.max(w0, h0)), q = 0.9, out = null, c = null;
+  for (let i = 0; i < 7; i++) {
+    c = document.createElement('canvas'); c.width = Math.round(w0 * scale); c.height = Math.round(h0 * scale);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    out = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+    if (out && out.size <= limit) break;
+    scale *= 0.8; q = Math.max(0.6, q - 0.07);
+  }
+  return { blob: out, w: c.width, h: c.height };
+}
+async function makeMapThumb(blob) {
+  const bmp = await decodeImage(blob);
+  const s = Math.min(1, 320 / bmp.width, 240 / bmp.height);
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bmp.width * s)); c.height = Math.max(1, Math.round(bmp.height * s));
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(bmp, 0, 0, c.width, c.height);
+  return await encode(c, 0.72);
+}
+async function addMapFromFile(file) {
+  const msg = t => { const el = $('#mapUploadMsg'); el.hidden = !t; el.className = 'hint'; el.textContent = t || ''; };
+  if (!file || !state.assets || !state.db) return;
+  if (!file.type.startsWith('image/')) { msg('That file isn’t a picture. Pick a JPG, PNG or WebP map.'); return; }
+  $('#mapFile').disabled = true;
+  try {
+    msg('Preparing the map…');
+    const big = await prepareMap(file);
+    msg(`Uploading the map (${(big.blob.size / 1e6).toFixed(1)} MB)…`);
+    const up = SITE && state.assets.uploadLarge ? await state.assets.uploadLarge(big.blob) : await state.assets.upload(big.blob, big.blob.type ? undefined : { type: 'image/jpeg' });
+    let thumb = '';
+    try { const tb = await makeMapThumb(big.blob); if (tb) thumb = (await state.assets.upload(tb)).id; } catch {}
+    const ref = state.db.collection('maps').doc();
+    const data = {
+      name: (file.name || 'Map').replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 60) || 'Map',
+      folderId: state.mapFolder !== 'all' ? state.mapFolder : null,
+      image: up.id, thumb, w: big.w, h: big.h, marks: [], createdAt: Date.now()
+    };
+    await ref.set(data);
+    if (!state.maps.some(m => m.id === ref.id)) state.maps.push({ id: ref.id, ...data });
+    msg(''); toast(`Added “${data.name}”`);
+    openMap(ref.id);
+  } catch (err) {
+    const c = err && err.code;
+    msg(c === 'too_large' ? 'That map is too big. Try a smaller picture.' : 'Couldn’t add the map. Check your connection and try again.');
+  } finally { $('#mapFile').disabled = false; $('#mapFile').value = ''; }
+}
+
+/* --- the viewer: pan with a drag, zoom with the wheel or a pinch (shared by the DM and the players) --- */
+function makeViewer(stage, canvas) {
+  const v = { s: 1, x: 0, y: 0, w: 1, h: 1, fitS: 1, pts: new Map(), pinch: null, drag: null, tool: null, onTap: null };
+  v.apply = () => { canvas.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`; };
+  v.size = (w, h) => { v.w = w; v.h = h; canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; };
+  v.fit = () => {
+    const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return;
+    v.fitS = Math.min(r.width / v.w, r.height / v.h); v.s = v.fitS;
+    v.x = (r.width - v.w * v.s) / 2; v.y = (r.height - v.h * v.s) / 2; v.apply();
+  };
+  v.toImage = e => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left - v.x) / v.s, y: (e.clientY - r.top - v.y) / v.s }; };
+  const local = e => { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  v.zoomAt = (cx, cy, f) => {
+    const ns = Math.max(v.fitS * 0.5, Math.min(v.fitS * 12, v.s * f));
+    v.x = cx - (cx - v.x) * ns / v.s; v.y = cy - (cy - v.y) * ns / v.s; v.s = ns; v.apply();
+  };
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const p = local(e), dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
+    v.zoomAt(p.x, p.y, Math.exp(-dy * 0.0015));
+  }, { passive: false });
+  stage.addEventListener('pointerdown', e => {
+    if (e.button > 1) return;
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+    v.pts.set(e.pointerId, local(e));
+    if (v.pts.size === 2) {
+      if (v.tool && v.tool.cancel) v.tool.cancel();
+      v.drag = null; v.toolOn = false;
+      const [a, b] = [...v.pts.values()];
+      v.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, s: v.s, x: v.x, y: v.y };
+      return;
+    }
+    if (v.pts.size > 2) return;
+    v.toolOn = !!(v.tool && v.tool.down && v.tool.down(e));
+    if (!v.toolOn) { const p = local(e); v.drag = { x: p.x, y: p.y, x0: v.x, y0: v.y, moved: false }; }
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!v.pts.has(e.pointerId)) return;
+    v.pts.set(e.pointerId, local(e));
+    if (v.pinch && v.pts.size >= 2) {
+      const [a, b] = [...v.pts.values()], P = v.pinch;
+      const ns = Math.max(v.fitS * 0.5, Math.min(v.fitS * 12, P.s * (Math.hypot(a.x - b.x, a.y - b.y) / P.d)));
+      const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      v.x = m.x - (P.m.x - P.x) * ns / P.s; v.y = m.y - (P.m.y - P.y) * ns / P.s; v.s = ns; v.apply();
+      return;
+    }
+    if (v.toolOn) { v.tool.move && v.tool.move(e); return; }
+    if (v.drag) {
+      const p = local(e), dx = p.x - v.drag.x, dy = p.y - v.drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) v.drag.moved = true;
+      if (v.drag.moved) { v.x = v.drag.x0 + dx; v.y = v.drag.y0 + dy; v.apply(); }
+    }
+  });
+  const end = e => {
+    if (!v.pts.has(e.pointerId)) return;
+    v.pts.delete(e.pointerId);
+    if (v.pinch) { if (v.pts.size < 2) v.pinch = null; v.drag = null; return; }
+    if (v.toolOn) { v.toolOn = false; if (e.type === 'pointercancel') v.tool.cancel && v.tool.cancel(); else v.tool.up && v.tool.up(e); return; }
+    if (v.drag && !v.drag.moved && e.type !== 'pointercancel' && v.onTap) v.onTap(v.toImage(e));
+    v.drag = null;
+  };
+  stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+  new ResizeObserver(() => { if (v.w > 1 && Math.abs(v.s - v.fitS) < 1e-6) v.fit(); }).observe(stage);
+  return v;
+}
+/* Show a map in a viewer: swap the picture only when it changes, then fit it. */
+function loadMapInto(v, imgEl, svgEl, m) {
+  if (imgEl.dataset.id !== m.image) {
+    imgEl.dataset.id = m.image;
+    imgEl.onload = () => { v.size(m.w || imgEl.naturalWidth, m.h || imgEl.naturalHeight); v.fit(); };
+    v.size(m.w || 1000, m.h || 1000); v.fit();
+    imgEl.src = imgSrc(m.image);
+  }
+  svgEl.setAttribute('viewBox', `0 0 ${m.w || 1000} ${m.h || 1000}`);
+}
+
+/* --- drawing the marks --- */
+// Pin size follows the S/M/L size it was made with (older pins: a default size).
+const pinR = (k, b) => k.s ? k.s * 0.5 : b * 18;
+function marksSvg(m, marks, dm) {
+  const b = mapBase(m), list = dm ? marks : marks.filter(k => k.vis !== 'dm');
+  const pts = p => { let s = ''; for (let i = 0; i + 1 < p.length; i += 2) s += (i ? ' ' : '') + p[i] + ',' + p[i + 1]; return s; };
+  const dmc = k => k.vis === 'dm' ? ' class="dmonly"' : '';
+  const label = (x, y, size, color, text) =>
+    `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" stroke="#000" stroke-width="${(size * 0.12).toFixed(1)}" paint-order="stroke" font-weight="700" font-family="Alegreya Sans, sans-serif">${esc(text)}</text>`;
+  // Paint strokes of one colour share one see-through layer, so overlaps don't get darker.
+  const byColor = {};
+  list.filter(k => k.k === 'paint').forEach(k => (byColor[k.c] = byColor[k.c] || []).push(k));
+  let out = Object.entries(byColor).map(([c, ks]) => `<g opacity="0.35">${ks.map(k =>
+    `<polyline${dmc(k)} points="${pts(k.p)}" stroke="${c}" stroke-width="${k.s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}</g>`).join('');
+  for (const k of list) {
+    if (k.k === 'pen') out += `<polyline${dmc(k)} points="${pts(k.p)}" stroke="${k.c}" stroke-width="${k.s}" fill="none" stroke-linecap="round" stroke-linejoin="round"${k.vis === 'dm' ? ` stroke-dasharray="${k.s * 2} ${k.s * 1.5}"` : ''}/>`;
+    else if (k.k === 'text') out += `<g${dmc(k)}>${label(k.x, k.y, k.s, k.c, k.t || '')}</g>`;
+    else if (k.k === 'pin') {
+      const r = pinR(k, b);
+      out += `<g${dmc(k)} transform="translate(${k.x},${k.y})"><path d="M0 0 C ${-r} ${-r * 1.4} ${-r} ${-r * 2.6} 0 ${-r * 2.6} C ${r} ${-r * 2.6} ${r} ${-r * 1.4} 0 0 Z" fill="${k.c}" stroke="#fff" stroke-width="${b * 2}"${k.vis === 'dm' ? ` stroke-dasharray="${b * 4} ${b * 3}"` : ''}/><circle cy="${-r * 1.75}" r="${r * 0.38}" fill="#fff"/>${k.t ? label(r * 1.1, -r * 1.6, r * 1.3, '#fff', k.t) : ''}</g>`;
+    }
+  }
+  return out;
+}
+/* The mark under a point (image pixels), for tapping pins/text and erasing. Topmost first. */
+function hitMark(m, marks, pt, scale) {
+  const b = mapBase(m), tol = Math.max(b * 6, 10 / scale);
+  const segDist = (p, i) => {
+    const ax = p[i], ay = p[i + 1], bx = p[i + 2] ?? ax, by = p[i + 3] ?? ay;
+    const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+    const t = l ? Math.max(0, Math.min(1, ((pt.x - ax) * dx + (pt.y - ay) * dy) / l)) : 0;
+    return Math.hypot(pt.x - (ax + t * dx), pt.y - (ay + t * dy));
+  };
+  for (let j = marks.length - 1; j >= 0; j--) {
+    const k = marks[j];
+    if (k.k === 'pin') { const r = pinR(k, b); if (Math.hypot(pt.x - k.x, pt.y - (k.y - r * 1.5)) < r * 1.6 + tol) return k; }
+    else if (k.k === 'text') { const w = (k.t || '').length * k.s * 0.55; if (pt.x > k.x - tol && pt.x < k.x + w + tol && pt.y > k.y - k.s - tol && pt.y < k.y + tol) return k; }
+    else { for (let i = 0; i + 1 < k.p.length; i += 2) if (segDist(k.p, i) < k.s / 2 + tol) return k; }
+  }
+  return null;
+}
+function drawDmMarks(extra) {
+  const m = curMap(); if (!m) return;
+  $('#mapSvg').innerHTML = marksSvg(m, m.marks, true) + (extra || '');
+}
+
+/* --- the DM's workspace --- */
+function renderMapWork() {
+  const m = curMap();
+  $('#mapPlaceholder').hidden = !!m; $('#mapWork').hidden = !m;
+  if (!m) { if (state.mapId) state.mapId = null; return; }
+  const live = state.shownMap && state.shownMap.id === m.id;
+  $('#mapTitle').textContent = m.name;
+  $('#mapLive').hidden = !live; $('#mapStopBtn').hidden = !live;
+  $('#mapSendBtn').textContent = live ? 'Send again' : 'Send to players';
+  $('#mapSendBtn').hidden = $('#mapTools').hidden = !state.canWrite;
+  document.querySelectorAll('[data-mtool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mtool === state.mapTool)));
+  document.querySelectorAll('[data-msize]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.msize === state.mapSize)));
+  document.querySelectorAll('[data-mvis]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mvis === state.mapVis)));
+  $('#mapColors').innerHTML = MAP_COLORS.map(c => `<button type="button" role="radio" data-mcolor="${c}" aria-checked="${state.mapColor === c}" aria-label="${c}" style="--sw:${c}"></button>`).join('');
+  $('#mapUndo').disabled = !state.mapUndo.length;
+  $('#mapStage').classList.toggle('drawing', state.mapTool !== 'move');
+  if (!dmViewer) { dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => editMarkAt(pt); }
+  loadMapInto(dmViewer, $('#mapImg'), $('#mapSvg'), m);
+  drawDmMarks();
+}
+function openMap(id) {
+  if (state.mapId !== id) state.mapUndo = [];
+  state.mapId = id;
+  $('#mapsView').dataset.mview = 'map';
+  renderMaps();
+  requestAnimationFrame(() => dmViewer && dmViewer.fit());
+}
+/* Change the current map's marks (with undo), save shortly after, and update the players if it's on their screen. */
+function changeMarks(fn) {
+  const m = curMap(); if (!m || !state.canWrite) return;
+  state.mapUndo.push(JSON.stringify(m.marks)); if (state.mapUndo.length > 60) state.mapUndo.shift();
+  m.marks = fn(m.marks.slice());
+  drawDmMarks(); $('#mapUndo').disabled = false;
+  saveMarksSoon(m);
+}
+function saveMarksSoon(m) {
+  mapDirtyId = m.id; clearTimeout(mapSaveT);
+  mapSaveT = setTimeout(async () => {
+    try { await state.db.collection('maps').doc(m.id).update({ marks: m.marks, updatedAt: Date.now() }); }
+    catch { toast('Couldn’t save the map marks. They’re still here; they’ll save with the next change.'); }
+    finally { if (mapDirtyId === m.id) mapDirtyId = null; }
+  }, 500);
+  if (state.shownMap && state.shownMap.id === m.id) pushMapSoon();
+}
+function undoMarks() {
+  const m = curMap(); if (!m || !state.mapUndo.length) return;
+  m.marks = JSON.parse(state.mapUndo.pop());
+  drawDmMarks(); $('#mapUndo').disabled = !state.mapUndo.length;
+  saveMarksSoon(m);
+}
+const newMarkId = () => Math.random().toString(36).slice(2, 10);
+function dmTool() {
+  let stroke = null, start = null;
+  const sizeK = () => ({ s: 1, m: 2, l: 4 })[state.mapSize];
+  return {
+    down(e) {
+      const m = curMap(); if (!m || !state.canWrite || state.mapTool === 'move') return false;
+      const pt = dmViewer.toImage(e); start = pt;
+      if (state.mapTool === 'pen' || state.mapTool === 'paint') {
+        const b = mapBase(m);
+        stroke = { k: state.mapTool, c: state.mapColor, vis: state.mapVis, s: Math.round((state.mapTool === 'pen' ? 3 : 18) * b * sizeK()) || 1, p: [Math.round(pt.x), Math.round(pt.y)] };
+      }
+      return true;
+    },
+    move(e) {
+      if (!stroke) return;
+      const m = curMap(), pt = dmViewer.toImage(e), p = stroke.p;
+      const minStep = Math.max(1, (stroke.k === 'pen' ? 1.5 : 4) * mapBase(m) / Math.max(0.2, dmViewer.s / dmViewer.fitS));
+      if (Math.hypot(pt.x - p[p.length - 2], pt.y - p[p.length - 1]) < minStep) return;
+      p.push(Math.round(pt.x), Math.round(pt.y));
+      const tmp = { ...stroke, id: 'tmp' };
+      drawDmMarks(marksSvg(m, [tmp], true));
+    },
+    up(e) {
+      const m = curMap(); if (!m) return;
+      const pt = dmViewer.toImage(e);
+      if (stroke) {
+        if (stroke.p.length === 2) stroke.p.push(stroke.p[0] + 1, stroke.p[1]);  // a tap makes a dot
+        const k = { id: newMarkId(), ...stroke }; stroke = null;
+        changeMarks(marks => [...marks, k]);
+        return;
+      }
+      if (Math.hypot(pt.x - start.x, pt.y - start.y) * dmViewer.s > 8) return;  // dragged, not a tap
+      if (state.mapTool === 'erase') {
+        const hit = hitMark(m, m.marks, pt, dmViewer.s);
+        if (hit) changeMarks(marks => marks.filter(x => x.id !== hit.id)); else toast('Tap right on a mark to erase it.');
+      } else if (state.mapTool === 'pin' || state.mapTool === 'text') {
+        openMarkDlg({ id: newMarkId(), k: state.mapTool, c: state.mapColor, vis: state.mapVis, x: Math.round(pt.x), y: Math.round(pt.y),
+          s: Math.round(24 * mapBase(m) * sizeK()), t: '', n: '' }, true);
+      }
+    },
+    cancel() { stroke = null; drawDmMarks(); }
+  };
+}
+/* Tapping a pin or a text with the Move tool opens it for editing. */
+function editMarkAt(pt) {
+  const m = curMap(); if (!m || !state.canWrite) return;
+  const hit = hitMark(m, m.marks, pt, dmViewer.s);
+  if (hit && (hit.k === 'pin' || hit.k === 'text')) openMarkDlg(hit, false);
+}
+function openMarkDlg(mark, isNew) {
+  state.markEditing = { mark: { ...mark }, isNew };
+  state.markVis = mark.vis;
+  $('#markTitle').textContent = (isNew ? 'New ' : '') + (mark.k === 'pin' ? 'pin' : 'text');
+  $('#markTextLbl').textContent = mark.k === 'pin' ? 'Label' : 'Text';
+  $('#markText').value = mark.t || '';
+  $('#markNoteField').hidden = mark.k !== 'pin';
+  $('#markNote').value = mark.n || '';
+  $('#markDel').hidden = isNew;
+  document.querySelectorAll('[data-markvis]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.markvis === state.markVis)));
+  $('#markSheet').hidden = false; $('#markText').focus();
+}
+function saveMarkDlg(e) {
+  e.preventDefault();
+  const ed = state.markEditing; if (!ed) return;
+  const k = { ...ed.mark, t: str($('#markText').value).slice(0, 80), n: ed.mark.k === 'pin' ? str($('#markNote').value).slice(0, 600) : '', vis: state.markVis };
+  if (k.k === 'text' && !k.t) { $('#markText').focus(); return; }
+  $('#markSheet').hidden = true; state.markEditing = null;
+  changeMarks(marks => ed.isNew ? [...marks, k] : marks.map(x => x.id === k.id ? k : x));
+}
+
+/* --- map details: rename, move to a folder, delete --- */
+function openMapDetails() {
+  const m = curMap(); if (!m) return;
+  $('#mapDetName').value = m.name;
+  $('#mapDetFolder').innerHTML = `<option value="">No folder</option>` + sortedFolders().map(f => `<option value="${esc(f.id)}"${f.id === m.folderId ? ' selected' : ''}>${esc(f.name)}</option>`).join('');
+  $('#mapDetErr').hidden = true; $('#mapDetSheet').hidden = false;
+}
+async function saveMapDetails(e) {
+  e.preventDefault();
+  const m = curMap(); if (!m) return;
+  const name = str($('#mapDetName').value).slice(0, 60) || m.name, folderId = $('#mapDetFolder').value || null;
+  try {
+    await state.db.collection('maps').doc(m.id).update({ name, folderId });
+    m.name = name; m.folderId = folderId; $('#mapDetSheet').hidden = true; renderMaps();
+    if (state.shownMap && state.shownMap.id === m.id) pushMapSoon();
+  } catch (err) { showErr('#mapDetErr', saveErrorText(err)); }
+}
+async function deleteMap(id) {
+  const m = state.maps.find(x => x.id === id); if (!m) return;
+  try {
+    await state.db.collection('maps').doc(id).delete();
+    state.maps = state.maps.filter(x => x.id !== id);
+    if (state.shownMap && state.shownMap.id === id) stopShowingMap(true);
+    if (state.assets) for (const a of [m.image, m.thumb]) if (isAssetId(a)) { try { await state.assets.delete(a); } catch {} }
+    state.mapId = null; $('#mapsView').dataset.mview = 'list';
+    toast(`Deleted “${m.name}”`); renderMaps();
+  } catch (err) { toast(saveErrorText(err)); }
+}
+
+/* --- showing a map to the players --- */
+function publicMap() {
+  const m = state.shownMap && state.maps.find(x => x.id === state.shownMap.id);
+  if (!m) {
+    // maps not loaded yet (claude.ai): keep what the player page already shows instead of wiping it
+    const pm = !SITE && state.shownMap && (readPub() || {}).map;
+    return pm && pm.id === state.shownMap.id ? pm : null;
+  }
+  return { id: m.id, name: m.name, image: m.image, w: m.w, h: m.h, marks: m.marks.filter(k => k.vis !== 'dm'), sentAt: state.shownMap.sentAt };
+}
+function pushMapSoon(delay = 300) {
+  if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
+  clearTimeout(mapPushT);
+  mapPushT = setTimeout(async () => {
+    try { await state.db.doc('public/map').set({ map: publicMap(), at: Date.now() }); }
+    catch { toast('Couldn’t update the players’ map. Try Send again.'); }
+  }, delay);
+}
+function sendMapToPlayers() {
+  const m = curMap(); if (!m || !state.canWrite) return;
+  state.shownMap = { id: m.id, sentAt: Date.now() }; ls.set('pb-shown-map', state.shownMap);
+  if (SITE) pushMapSoon(0); else { clearTimeout(playersTimer); publishPlayers(); }
+  toast(`Showing “${m.name}” to your players`); renderMaps();
+}
+function stopShowingMap(quiet) {
+  state.shownMap = null; ls.set('pb-shown-map', null);
+  if (SITE) pushMapSoon(0); else { clearTimeout(playersTimer); publishPlayers(); }
+  if (!quiet) toast('Players no longer see a map'); renderMaps();
+}
+
+/* --- the players' screen: Initiative / Map switch --- */
+function setPvMap(d) {
+  state.pvMapData = d && d.image ? d : null;
+  // The DM pressed Send: jump to the map (once per send). Players can switch back themselves;
+  // later mark changes on the same send don't pull them back. (Remembered in memory, and across claude.ai reloads.)
+  state.pvSeenSent = Math.max(state.pvSeenSent || 0, +(ss.get('pv-map-sent') || 0));
+  if (state.pvMapData && state.pvMapData.sentAt && state.pvMapData.sentAt > state.pvSeenSent && !state.previewPlayer) {
+    state.pvSeenSent = state.pvMapData.sentAt; ss.set('pv-map-sent', state.pvSeenSent); state.pvTab = 'map';
+  }
+  if (!state.pvMapData && state.pvTab === 'map') state.pvTab = 'init';
+  renderPvTab();
+}
+function renderPvTab() {
+  const has = !!state.pvMapData, onMap = has && state.pvTab === 'map';
+  $('#pvSwitch').hidden = !has;
+  document.querySelectorAll('[data-pvtab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pvtab === (onMap ? 'map' : 'init'))));
+  $('#playerView').classList.toggle('map-mode', onMap);
+  $('#pvMap').hidden = !onMap;
+  if (!onMap) return;
+  const m = state.pvMapData;
+  $('#pvMapName').textContent = m.name || 'Map';
+  if (!pvViewer) {
+    pvViewer = makeViewer($('#pvStage'), $('#pvCanvas'));
+    pvViewer.onTap = pt => {
+      const cur = state.pvMapData; if (!cur) return;
+      const hit = hitMark(cur, cur.marks || [], pt, pvViewer.s);
+      const note = $('#pvPinNote');
+      if (hit && hit.k === 'pin' && (hit.t || hit.n)) { note.hidden = false; note.textContent = [hit.t, hit.n].filter(Boolean).join('\n'); }
+      else note.hidden = true;
+    };
+  }
+  loadMapInto(pvViewer, $('#pvMapImg'), $('#pvSvg'), m);
+  $('#pvSvg').innerHTML = marksSvg(m, m.marks || [], false);
+  requestAnimationFrame(() => { if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
+}
 
 /* ---------- boot ---------- */
 async function waitForClaude() {
@@ -3606,6 +4326,23 @@ async function connect() {
     ls.set('pb-books', state.books);
     renderList(); renderDetail();
   }, () => {});
+  db.collection('mapFolders').onSnapshot(snap => {
+    state.mapFolders = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(f => f.name);
+    if ($('#app').dataset.tab === 'maps') renderMaps();
+  }, () => {});
+  db.collection('maps').onSnapshot(snap => {
+    const local = state.maps.find(m => m.id === mapDirtyId);  // keep marks that are still waiting to save
+    state.maps = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(m => m.image)
+      .map(m => ({ ...m, name: str(m.name) || 'Map', marks: m.id === mapDirtyId && local ? local.marks : cleanMarks(m.marks) }));
+    if ($('#app').dataset.tab === 'maps') renderMaps();
+  }, () => {});
+  // Which map the players are looking at (the website keeps it in public/map; claude.ai in the player page).
+  if (SITE && SITE.watchMap) SITE.watchMap(d => {
+    const pm = d && d.map;
+    state.shownMap = pm ? { id: pm.id, sentAt: pm.sentAt } : null; ls.set('pb-shown-map', state.shownMap);
+    if ($('#app').dataset.tab === 'maps') renderMaps(); else $('#mapBadge').hidden = !state.shownMap;
+  });
+  else { const pm = (readPub() || {}).map; state.shownMap = pm ? { id: pm.id, sentAt: pm.sentAt } : null; ls.set('pb-shown-map', state.shownMap); $('#mapBadge').hidden = !state.shownMap; }
   db.collection('monsters').onSnapshot(snap => {
     state.monsters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     state.loaded = true;
@@ -3634,7 +4371,8 @@ state.books = (ls.get('pb-books', []) || []).filter(b => b && b.id && b.name);
 state.groups = (ls.get('pb-groups', []) || []).filter(g => g && g.id).map(g => ({ ...g, players: cleanPlayers(g.players) }));
 state.book = ls.get('pb-book', 'all') || 'all';
 renderList(); renderDetail(); renderTray();
-setTab(ls.get('pb-tab', 'bestiary') === 'init' ? 'init' : 'bestiary');
+state.shownMap = ls.get('pb-shown-map', null);
+setTab(['init', 'maps'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
 if (!playerLink) restoreScreen();
 if (playerLink) showPlayers(); else connect();

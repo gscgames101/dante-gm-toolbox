@@ -44,6 +44,15 @@
     return out;
   }
   const putAsset = async (id, dataUrl) => fs.collection('assets').doc(id).set({ data: await shrink(dataUrl), at: Date.now() });
+  /* Big pictures (maps) at full quality: split across several documents.
+     assets/<id> holds {chunks: n}; assets/<id>_0 … <id>_(n-1) hold the pieces of the data URL. */
+  async function putAssetLarge(id, dataUrl) {
+    const col = fs.collection('assets');
+    if (dataUrl.length <= MAX) return col.doc(id).set({ data: dataUrl, at: Date.now() });
+    const n = Math.ceil(dataUrl.length / MAX);
+    for (let i = 0; i < n; i++) await col.doc(`${id}_${i}`).set({ data: dataUrl.slice(i * MAX, (i + 1) * MAX) });
+    await col.doc(id).set({ chunks: n, at: Date.now() });
+  }
 
   const assets = {
     async upload(blob) {
@@ -52,7 +61,18 @@
       pics.set(id, data);
       return { id, url: '_blob/' + id };
     },
-    async delete(id) { await fs.collection('assets').doc(id).delete(); }
+    async uploadLarge(blob) {
+      const id = hex(), data = await toDataUrl(blob);
+      await putAssetLarge(id, data);
+      pics.set(id, data);
+      return { id, url: '_blob/' + id };
+    },
+    async delete(id) {
+      const col = fs.collection('assets');
+      try { const s = await col.doc(id).get(); const n = s.exists && s.data().chunks; for (let i = 0; i < (n || 0); i++) await col.doc(`${id}_${i}`).delete(); } catch {}
+      await col.doc(id).delete();
+      pics.delete(id);
+    }
   };
   const user = { isOwner: isDM, canEdit: isDM, can: async () => isDM() };
   const siteMarker = { site: true };
@@ -83,7 +103,9 @@
     },
     user: () => auth.currentUser,
     watchPlayers: cb => fs.doc('public/current').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}),
+    watchMap: cb => fs.doc('public/map').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}),
     putAsset,
+    putAssetLarge,
     imgSrc: id => window.SITE_imgSrc(id),
     picData: id => loadPic(id).then(d => { if (!d) throw new Error('missing'); return d; })
   };
@@ -94,8 +116,14 @@
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   const pics = new Map();  // id -> data URL (or a pending promise)
   const loadPic = id => {
-    if (!pics.has(id)) pics.set(id, fs.collection('assets').doc(id).get().then(s => {
-      const d = s.exists && s.data().data; if (d) pics.set(id, d); else pics.delete(id); return d || '';
+    if (!pics.has(id)) pics.set(id, fs.collection('assets').doc(id).get().then(async s => {
+      const meta = s.exists ? s.data() : null;
+      let d = meta && meta.data;
+      if (meta && meta.chunks) {  // a big map stored in pieces
+        const parts = await Promise.all(Array.from({ length: meta.chunks }, (_, i) => fs.collection('assets').doc(`${id}_${i}`).get()));
+        d = parts.every(p => p.exists) ? parts.map(p => p.data().data).join('') : '';
+      }
+      if (d) pics.set(id, d); else pics.delete(id); return d || '';
     }, () => { pics.delete(id); return ''; }));
     const v = pics.get(id); return typeof v === 'string' ? Promise.resolve(v) : v;
   };
