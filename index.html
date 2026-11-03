@@ -556,7 +556,22 @@ button.cb-pic { cursor: zoom-in; }
 .pv-map-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pv-map-bar b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--accent); }
 .pv-map-bar .hint { flex: 1; min-width: 10em; }
-.pv-pin-note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--accent); white-space: pre-line; }
+.pv-map-body { position: relative; flex: 1; min-height: 0; display: flex; gap: 10px; }
+.pv-map-body .map-stage { flex: 1; min-width: 0; }
+.pv-pin { flex: none; width: 320px; display: flex; flex-direction: column; gap: 14px; padding: 12px 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow-y: auto; }
+.pv-pin[hidden] { display: none; }
+.pv-pin-head { display: flex; align-items: center; gap: 8px; margin: -4px -6px -4px 0; }
+.pv-pin-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex: none; }
+.pv-pin-kicker { flex: 1; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pv-pin-field { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pv-pin-label { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pv-pin-field h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 1.4rem; line-height: 1.2; color: var(--accent); overflow-wrap: anywhere; }
+.pv-pin-field h3.none { font-family: inherit; font-size: 1rem; font-style: italic; color: var(--muted); }
+.pv-pin-field p { margin: 0; white-space: pre-line; line-height: 1.5; overflow-wrap: anywhere; }
+/* Small screens: the panel slides over the right side of the map instead of squeezing it. */
+@media (max-width: 700px) {
+  .pv-pin { position: absolute; top: 0; right: 0; bottom: 0; width: min(85%, 320px); z-index: 2; box-shadow: -6px 0 18px #00000059; }
+}
 
 /* Big screens (laptops, desktop monitors, TVs): wider columns, centred bars, and stat blocks in two columns like the books. */
 @media (min-width: 1100px) {
@@ -718,9 +733,19 @@ button.cb-pic { cursor: zoom-in; }
       </div>
     </div>
     <section class="pv-map" id="pvMap" hidden>
-      <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+      <div class="pv-map-body">
+        <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+        <aside class="pv-pin" id="pvPinNote" aria-label="Pin" aria-live="polite" hidden>
+          <div class="pv-pin-head">
+            <span class="pv-pin-dot" id="pvPinDot"></span>
+            <span class="pv-pin-kicker">Pin</span>
+            <button type="button" class="icon-btn" data-act="pv-pin-close" aria-label="Close" title="Close">✕</button>
+          </div>
+          <div class="pv-pin-field"><span class="pv-pin-label">Title</span><h3 id="pvPinTitle"></h3></div>
+          <div class="pv-pin-field" id="pvPinNoteWrap"><span class="pv-pin-label">Notes</span><p id="pvPinText"></p></div>
+        </aside>
+      </div>
       <div class="pv-map-bar"><b id="pvMapName"></b><span class="hint">Drag to move · pinch or scroll to zoom · tap a pin to read it</span><button type="button" class="btn small" data-act="pv-fit">Fit</button></div>
-      <p class="pv-pin-note" id="pvPinNote" hidden></p>
       <div class="empty" id="pvMapEmpty" hidden><h3>No map right now</h3><p>Your DM isn’t showing a map at the moment.</p></div>
     </section>
     <div class="pv-wrap">
@@ -3558,6 +3583,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'pv-fit': if (pvViewer) pvViewer.fit(); break;
+    case 'pv-pin-close': $('#pvPinNote').hidden = true; break;
     case 'fullscreen': toggleFullscreen(); break;
     case 'dm-signin': SITE.signIn().catch(() => toast('Sign-in didn’t finish. Try again.')); break;
     case 'dm-signout': SITE.signOut(); break;
@@ -4284,9 +4310,14 @@ function renderPvTab() {
     pvViewer.onTap = pt => {
       const cur = state.pvMapData; if (!cur) return;
       const hit = hitMark(cur, cur.marks || [], pt, pvViewer.s);
-      const note = $('#pvPinNote');
-      if (hit && hit.k === 'pin' && (hit.t || hit.n)) { note.hidden = false; note.textContent = [hit.t, hit.n].filter(Boolean).join('\n'); }
-      else note.hidden = true;
+      const panel = $('#pvPinNote');
+      if (!hit || hit.k !== 'pin' || !(hit.t || hit.n)) { panel.hidden = true; return; }
+      const title = $('#pvPinTitle');
+      title.textContent = hit.t || 'Untitled pin'; title.classList.toggle('none', !hit.t);
+      $('#pvPinText').textContent = hit.n || '';
+      $('#pvPinNoteWrap').hidden = !hit.n;
+      $('#pvPinDot').style.background = hit.c || '';
+      panel.hidden = false; panel.scrollTop = 0;
     };
   }
   loadMapInto(pvViewer, $('#pvMapImg'), $('#pvSvg'), m);
