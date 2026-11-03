@@ -377,7 +377,19 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-last .tot.fumble { color: var(--bad); }
 .pv-last.fresh { animation: pvfresh 1.6s ease-out; }
 @keyframes pvfresh { 0% { background: var(--accent); transform: scale(1.03); } 100% { background: var(--surface); transform: none; } }
-@media (prefers-reduced-motion: reduce) { .pv-last.fresh { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .pv-last.fresh, .pv-now.fresh { animation: none; } }
+/* Current turn card: stays pinned at the top while the turn order scrolls under it. */
+.pv-now { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); box-shadow: 0 6px 14px -8px #000000a6; }
+.pv-now[hidden] { display: none; }
+.pv-now .k { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.pv-now .pv-thumb { grid-row: span 2; width: 64px; height: 64px; font-size: 1.6rem; }
+.pv-now .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pv-now .who b { font-family: var(--display); font-weight: 400; font-size: 1.7rem; line-height: 1.15; color: var(--accent); overflow-wrap: anywhere; }
+.pv-now .nx { font-size: .9rem; color: var(--muted); overflow-wrap: anywhere; }
+.pv-now .nx b { color: var(--ink); }
+.pv-now:not(:has(.pv-thumb + .who + .nx)) .pv-thumb { grid-row: auto; }
+.pv-now.fresh { animation: pvfresh 1.6s ease-out; }
+.pv-wrap > .pv-cols .pv-now { order: 2; }
 .pv-at { margin: 0; text-align: center; font-size: .78rem; color: var(--muted); }
 .pv-steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 .add-row { flex-wrap: wrap; }
@@ -788,6 +800,7 @@ button.cb-pic { cursor: zoom-in; }
             <h2>Initiative</h2>
             <div class="round"><span>Round</span><b id="pvRound">—</b></div>
           </div>
+          <section class="pv-now" id="pvNow" aria-live="polite" hidden></section>
           <ol class="pv-list" id="pvList"></ol>
           <div class="empty" id="pvEmpty"><h3>No fight yet</h3><p>The turn order appears here when your DM starts an encounter. It updates by itself.</p></div>
         </div>
@@ -3048,9 +3061,22 @@ function renderPlayerView(d) {
       ${c.pc ? '<span class="pc-tag">PC</span>' : ''}
       ${i === ti ? '<span class="pv-tag">Now</span>' : i === next ? '<span class="pv-tag soft">Up next</span>' : ''}
     </li>`).join('');
-  const now = document.querySelector('.pv.now');
-  if (now) now.scrollIntoView({ block: 'nearest' });
+  // Whose turn it is: pinned at the top (like the latest roll), with who's up next.
+  const nowEl = $('#pvNow'), cur = list[ti];
+  nowEl.hidden = !cur;
+  if (cur) {
+    const key = cur.id + '|' + (d.round || 0), nx = list[next];
+    nowEl.innerHTML = `<span class="k">Current turn${d.round ? ` · round ${+d.round}` : ''}</span>
+      ${isAssetId(cur.img)
+        ? `<button type="button" class="pv-thumb" data-zoom="${cur.img}" aria-label="Show ${esc(cur.name)} full size"><img src="${imgSrc(isAssetId(cur.thumb) ? cur.thumb : cur.img)}" alt="" decoding="async" width="64" height="64" data-l="${esc((cur.name || '?')[0].toUpperCase())}" onerror="this.replaceWith(this.dataset.l)"></button>`
+        : `<span class="pv-thumb" aria-hidden="true">${esc((cur.name || '?')[0].toUpperCase())}</span>`}
+      <span class="who"><b>${esc(cur.name)}</b>${cur.pc ? '<span class="pc-tag">PC</span>' : ''}</span>
+      ${nx && nx !== cur ? `<span class="nx">Up next: <b>${esc(nx.name)}</b></span>` : ''}`;
+    if (pvNowKey !== null && key !== pvNowKey) { nowEl.classList.remove('fresh'); void nowEl.offsetWidth; nowEl.classList.add('fresh'); }
+    pvNowKey = key;
+  } else if (d) pvNowKey = '';
 }
+let pvNowKey = null;
 /* Player screen: shows the turn order baked into this version of the page (a new version replaces it). */
 /* Players' screen: keep the device awake. A dimmed or locked phone pauses the page, and updates then arrive late. */
 let wakeLock = null;
