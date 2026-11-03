@@ -351,10 +351,16 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-roll.has-pic { grid-template-columns: auto minmax(0, 1fr) auto; }
 .pv-roll.has-pic .tot { grid-column: 3; }
 .pv-thumb.sm { width: 34px; height: 34px; border-radius: 6px; }
-.pv-roll .what { min-width: 0; }
-.pv-roll .what b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pv-roll .what span { display: block; font-size: .8rem; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pv-roll .tot { grid-row: 1 / span 2; grid-column: 2; font-family: var(--mono); font-weight: 700; font-size: 1.5rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+/* Roll text (latest roll and earlier rolls): who · what · dice, each on its own line and allowed to wrap. */
+.pv-last .what, .pv-roll .what { min-width: 0; display: grid; gap: 2px; }
+.pv-last .what .who, .pv-roll .what .who { display: flex; align-items: baseline; gap: 8px; font-size: .85rem; font-weight: 700; color: var(--muted); overflow-wrap: anywhere; }
+.pv-last .what .who i, .pv-roll .what .who i { font-style: normal; font-weight: 400; font-size: .78rem; margin-left: auto; white-space: nowrap; }
+.pv-last .what b, .pv-roll .what b { display: block; line-height: 1.25; overflow-wrap: anywhere; white-space: normal; }
+.pv-roll .what b { font-size: 1.05rem; }
+.pv-last .what .dice, .pv-roll .what .dice { display: block; font-family: var(--mono); font-size: .9rem; color: var(--muted); overflow-wrap: anywhere; white-space: normal; }
+.pv-last .what .faces, .pv-roll .what .faces { color: var(--ink); font-weight: 700; }
+.pv-roll { padding: 10px 14px; gap: 0 14px; }
+.pv-roll .tot { grid-row: 1 / span 2; grid-column: 2; font-family: var(--mono); font-weight: 700; font-size: 1.7rem; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
 .pv-roll .tot.crit { color: var(--good); }
 .pv-roll .tot.fumble { color: var(--bad); }
 .send-rolls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; margin-bottom: 8px; border-radius: 8px; background: var(--accent-soft); border: 1px dashed var(--accent); font-size: .9rem; }
@@ -365,9 +371,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-last { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); }
 .pv-last.has-pic { grid-template-columns: auto minmax(0, 1fr) auto; }
 .pv-last .k { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.pv-last .what { min-width: 0; }
-.pv-last .what b { display: block; font-size: 1.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pv-last .what span { display: block; font-size: .85rem; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-last .what b { font-size: 1.3rem; }
 .pv-last .tot { font-family: var(--mono); font-weight: 700; font-size: 2.3rem; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
 .pv-last .tot.crit { color: var(--good); }
 .pv-last .tot.fumble { color: var(--bad); }
@@ -2990,6 +2994,12 @@ function checkPlayersScreen() {
   playersSentKey = key;
   schedulePlayersUpdate(250);
 }
+/* One roll on the players' screen: who rolled, what for, then the dice. Each on its own line, wrapping instead of cut off. */
+const pvRollText = r => `<span class="what">
+  <span class="who">${esc(r.who)}${r.round ? `<i>Round ${+r.round}</i>` : ''}</span>
+  <b>${esc(r.label)}</b>
+  <span class="dice">${esc(r.pretty)} → <span class="faces">${(r.rolls || []).map(n => +n).join(', ')}</span></span>
+</span>`;
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
   const list = (d && Array.isArray(d.list)) ? d.list.filter(c => c && c.name) : [];
@@ -3010,7 +3020,7 @@ function renderPlayerView(d) {
     lastEl.className = 'pv-last' + (pic ? ' has-pic' : '');
     lastEl.innerHTML = `<span class="k">Latest roll</span>
       ${pic ? `<button type="button" class="pv-thumb" data-zoom="${pic.img}" aria-label="Show ${esc(last.who)} full size"><img src="${imgSrc(isAssetId(pic.thumb) ? pic.thumb : pic.img)}" alt="" decoding="async" width="48" height="48" onerror="this.remove()"></button>` : ''}
-      <span class="what"><b>${esc(last.who)}: ${esc(last.label)}</b><span>${esc(last.pretty)} → [${(last.rolls || []).map(n => +n).join(', ')}]${last.round ? ` · round ${+last.round}` : ''}</span></span>
+      ${pvRollText(last)}
       <span class="tot${last.crit === 'crit' ? ' crit' : last.crit === 'fumble' ? ' fumble' : ''}">${+last.total}${last.crit === 'crit' ? ' ★' : ''}</span>`;
     if (pvLastKey !== null && key !== pvLastKey) { lastEl.classList.remove('fresh'); void lastEl.offsetWidth; lastEl.classList.add('fresh'); }
     pvLastKey = key;
@@ -3022,7 +3032,7 @@ function renderPlayerView(d) {
   $('#pvRolls').innerHTML = rolls.map(r => `
     <li class="pv-roll${picOf[r.who] ? ' has-pic' : ''}">
       ${picOf[r.who] ? `<button type="button" class="pv-thumb sm" data-zoom="${picOf[r.who].img}" aria-label="Show ${esc(r.who)} full size"><img src="${imgSrc(isAssetId(picOf[r.who].thumb) ? picOf[r.who].thumb : picOf[r.who].img)}" alt="" loading="lazy" decoding="async" width="32" height="32" onerror="this.remove()"></button>` : ''}
-      <span class="what"><b>${esc(r.who)}: ${esc(r.label)}</b><span>${esc(r.pretty)} → [${(r.rolls || []).map(n => +n).join(', ')}]${r.round ? ` · round ${+r.round}` : ''}</span></span>
+      ${pvRollText(r)}
       <span class="tot${r.crit === 'crit' ? ' crit' : r.crit === 'fumble' ? ' fumble' : ''}">${+r.total}${r.crit === 'crit' ? ' ★' : ''}</span>
     </li>`).join('');
   $('#pvList').innerHTML = list.map((c, i) => `
