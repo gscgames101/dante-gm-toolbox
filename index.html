@@ -530,8 +530,11 @@ button.cb-pic { cursor: zoom-in; }
 .map-work { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .map-work[hidden] { display: none; }
 .map-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 10px 6px; }
-.map-bar h2 { flex: 1; min-width: 6em; font-family: var(--display); font-weight: 400; font-size: 1.35rem; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
+.map-bar h2 { flex: 1; min-width: 6em; font-family: var(--display); font-weight: 400; font-size: 1.35rem; color: var(--accent); overflow: hidden; }
+.map-title { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 36px; padding: 0 6px; margin-left: -6px; border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; color: inherit; cursor: pointer; }
+.map-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.map-title svg { flex: none; color: var(--muted); }
+.map-title:hover { border-color: var(--line); }.map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
 .map-colors { display: flex; gap: 5px; flex-wrap: wrap; }
 .map-colors button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
 .map-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--accent); }
@@ -672,7 +675,7 @@ button.cb-pic { cursor: zoom-in; }
       <div class="map-work" id="mapWork" hidden>
         <div class="map-bar gutter">
           <button type="button" class="btn small ghost map-back" data-act="map-back">← Maps</button>
-          <h2 id="mapTitle"></h2>
+          <h2><button type="button" class="map-title" data-act="map-rename" title="Rename map"><span id="mapTitle"></span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button></h2>
           <span class="live-tag" id="mapLive" hidden>LIVE</span>
           <button type="button" class="btn small ghost" data-act="map-details">Details</button>
           <button type="button" class="btn small ghost danger" data-act="map-stop" id="mapStopBtn" hidden>Stop showing</button>
@@ -3535,6 +3538,7 @@ document.addEventListener('click', async ev => {
     }
     case 'map-back': $('#mapsView').dataset.mview = 'list'; renderMaps(); break;
     case 'map-details': openMapDetails(); break;
+    case 'map-rename': if (state.canWrite) { openMapDetails(); const i = $('#mapDetName'); i.focus(); i.select(); } break;
     case 'mapdet-cancel': $('#mapDetSheet').hidden = true; break;
     case 'map-delete': {
       const m = curMap(); if (!m) break;
