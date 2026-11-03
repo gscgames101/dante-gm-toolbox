@@ -547,15 +547,23 @@ button.cb-pic { cursor: zoom-in; }
 .map-canvas img, .map-canvas svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .map-canvas .dmonly { opacity: .55; }
 /* Players' screen: Initiative / Map switch, and the map filling the screen */
-.pv-switch { display: flex; justify-content: center; padding-top: 12px; }
-.pv-switch .seg button { min-height: 40px; padding: 0 18px; font-size: .9rem; }
+/* Players' controls live in the top bar: map name, Initiative/Map switch, Fit. */
+.pv-switch { display: flex; flex: none; }
+.pv-switch .seg button { min-height: 36px; padding: 0 14px; font-size: .85rem; }
+.pv-hdr[hidden], .app:not([data-role="player"]) .pv-hdr { display: none !important; }
+.hdr-map { font-family: var(--display); font-weight: 400; font-size: 1.15rem; color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 12px; border-left: 1px solid var(--line); }
+#pvFitBtn { flex: none; min-height: 36px; }
+@media (max-width: 640px) {
+  /* Phones: on the map, the map's name takes the app title's place. */
+  .app[data-role="player"]:has(.player-view.map-mode) .brand h1 { display: none; }
+  .hdr-map { padding-left: 0; border-left: 0; font-size: 1.05rem; color: var(--accent); }
+  .top { gap: 8px; }
+  .pv-switch .seg button { padding: 0 10px; }
+}
 .app[data-role="player"] main.player-view.map-mode { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 12px; }
 .player-view.map-mode .pv-wrap { display: none; }
 .pv-map { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
 .pv-map .map-stage { border-radius: var(--radius); border: 1px solid var(--line); }
-.pv-map-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pv-map-bar b { font-family: var(--display); font-weight: 400; font-size: 1.2rem; color: var(--accent); }
-.pv-map-bar .hint { flex: 1; min-width: 10em; }
 .pv-map-body { position: relative; flex: 1; min-height: 0; display: flex; gap: 10px; }
 .pv-map-body .map-stage { flex: 1; min-width: 0; }
 .pv-pin { flex: none; width: 320px; display: flex; flex-direction: column; gap: 14px; padding: 12px 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow-y: auto; }
@@ -604,7 +612,15 @@ button.cb-pic { cursor: zoom-in; }
     <div class="brand">
       <h1>Dante's GM Toolbox</h1>
       <span class="sync" id="sync" data-state="idle">Connecting…</span>
+      <b class="pv-hdr hdr-map" id="pvMapName" hidden></b>
     </div>
+    <div class="pv-hdr pv-switch" id="pvSwitch" hidden>
+      <div class="seg" role="group" aria-label="What to show">
+        <button type="button" data-pvtab="init" aria-pressed="true">Initiative</button>
+        <button type="button" data-pvtab="map" aria-pressed="false">Map</button>
+      </div>
+    </div>
+    <button type="button" class="pv-hdr btn small" id="pvFitBtn" data-act="pv-fit" title="Fit the whole map on screen" hidden>Fit</button>
     <button type="button" class="icon-btn" id="fsBtn" data-act="fullscreen" aria-label="Full screen" title="Full screen" hidden>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path class="fs-on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="fs-off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>
     </button>
@@ -726,12 +742,6 @@ button.cb-pic { cursor: zoom-in; }
   </main>
 
   <main class="pane gutter player-view" id="playerView" aria-label="Initiative order">
-    <div class="pv-switch" id="pvSwitch" hidden>
-      <div class="seg" role="group" aria-label="What to show">
-        <button type="button" data-pvtab="init" aria-pressed="true">Initiative</button>
-        <button type="button" data-pvtab="map" aria-pressed="false">Map</button>
-      </div>
-    </div>
     <section class="pv-map" id="pvMap" hidden>
       <div class="pv-map-body">
         <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
@@ -745,7 +755,6 @@ button.cb-pic { cursor: zoom-in; }
           <div class="pv-pin-field" id="pvPinNoteWrap"><span class="pv-pin-label">Notes</span><p id="pvPinText"></p></div>
         </aside>
       </div>
-      <div class="pv-map-bar"><b id="pvMapName"></b><span class="hint">Drag to move · pinch or scroll to zoom · tap a pin to read it</span><button type="button" class="btn small" data-act="pv-fit">Fit</button></div>
       <div class="empty" id="pvMapEmpty" hidden><h3>No map right now</h3><p>Your DM isn’t showing a map at the moment.</p></div>
     </section>
     <div class="pv-wrap">
@@ -4302,6 +4311,7 @@ function renderPvTab() {
   document.querySelectorAll('[data-pvtab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pvtab === (onMap ? 'map' : 'init'))));
   $('#playerView').classList.toggle('map-mode', onMap);
   $('#pvMap').hidden = !onMap;
+  $('#pvMapName').hidden = $('#pvFitBtn').hidden = !onMap;
   if (!onMap) return;
   const m = state.pvMapData;
   $('#pvMapName').textContent = m.name || 'Map';
