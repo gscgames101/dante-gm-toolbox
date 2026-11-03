@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#e7e9e1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111412" media="(prefers-color-scheme: dark)">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -33,6 +36,7 @@
   --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
   --radius: 10px;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -47,7 +51,7 @@
   --good: #6cc490; --bad: #f08a6a; color-scheme: dark;
 }
 [hidden] { display: none !important; }
-html { box-sizing: border-box; height: 100%; }
+html { box-sizing: border-box; height: 100%; background: var(--bg); }  /* also fills the notch / safe-area edges on phones */
 *, *::before, *::after { box-sizing: inherit; }
 body { height: 100%; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 1rem; line-height: 1.45; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -1355,7 +1359,16 @@ function applyPrefs() {
   const th = ls.get('pb-theme', '');
   if (th === 'dark' || th === 'light') document.documentElement.dataset.theme = th;
   document.documentElement.style.fontSize = FONT_SIZES[ls.get('pb-fs', 'm')] || FONT_SIZES.m;
+  syncThemeColor();
 }
+/* Phones colour their browser bar from <meta name="theme-color">. Match the app's theme (including the Settings choice). */
+function syncThemeColor() {
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+  const m = document.createElement('meta'); m.name = 'theme-color';
+  m.content = isDark() ? '#111412' : '#e7e9e1';
+  document.head.appendChild(m);
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor); } catch {}
 function isDark() {
   const t = document.documentElement.dataset.theme;
   return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -3711,7 +3724,7 @@ document.addEventListener('click', async ev => {
     case 'set-backup': $('#setSheet').hidden = true; openBackup(); break;
     case 'toggle-dark': {
       const next = isDark() ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next; ls.set('pb-theme', next); renderSettings();
+      document.documentElement.dataset.theme = next; ls.set('pb-theme', next); syncThemeColor(); renderSettings();
       break;
     }
     case 'grp-open': openGroups(); break;
