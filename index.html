@@ -2816,6 +2816,7 @@ function encChanged() {
   encDirty = true;
   clearTimeout(encSaveT); encSaveT = setTimeout(encFlush, 500);
   renderEncounter();
+  checkPlayersScreen();
 }
 async function encFlush() {
   if (!state.db || !state.canWrite) { encDirty = false; return; }
@@ -2896,7 +2897,8 @@ async function publishPlayers() {
   if (SITE) {
     const before = state.enc.pubAt || 0;
     state.enc.pubAt = Date.now(); encChanged();
-    try { await state.db.doc('public/current').set({ ...publicEnc(), at: Date.now() }); }
+    const pub = publicEnc(); playersSentKey = JSON.stringify(pub);
+    try { await state.db.doc('public/current').set({ ...pub, at: Date.now() }); }
     catch { state.enc.pubAt = before; encChanged(); toast('Couldn’t update the players’ screen. It will try again on the next turn.'); }
     return;
   }
@@ -2950,6 +2952,19 @@ function publicEnc() {
     }),
     rolls: (state.enc.log || []).filter(r => !hiddenNames.has(r.who)).slice(0, 12).map(r => ({ who: r.who, label: r.label, pretty: r.pretty, rolls: r.rolls, total: r.total, crit: r.crit, round: r.round }))
   };
+}
+/* Website: anything the DM changes that players can see goes out by itself.
+   We compare what the players' screen should show with what was last sent, after every change and once a second
+   (that also catches things like a new monster picture). On claude.ai each send reloads the DM's page, so there
+   it stays tied to turns, rolls and Send. */
+let playersSentKey = null;
+function checkPlayersScreen() {
+  if (!SITE || state.role !== 'dm' || !state.canWrite || !state.db || !state.loaded || state.previewPlayer) return;
+  const key = JSON.stringify(publicEnc());
+  if (playersSentKey === null) { playersSentKey = key; return; }  // first look after opening: nothing changed yet
+  if (key === playersSentKey) return;
+  playersSentKey = key;
+  schedulePlayersUpdate(250);
 }
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
@@ -4454,6 +4469,7 @@ state.shownMap = ls.get('pb-shown-map', null);
 setTab(['init', 'maps'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
 setupFullscreen();
+if (SITE) setInterval(checkPlayersScreen, 1000);
 if (!playerLink) restoreScreen();
 if (playerLink) showPlayers(); else connect();
 })();
