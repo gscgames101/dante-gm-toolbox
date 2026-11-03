@@ -4129,8 +4129,9 @@ function dmTool() {
       const m = curMap(); if (!m || !state.canWrite || state.mapTool === 'move') return false;
       const pt = dmViewer.toImage(e); start = pt;
       if (state.mapTool === 'pen' || state.mapTool === 'paint') {
-        const b = mapBase(m);
-        stroke = { k: state.mapTool, c: state.mapColor, vis: state.mapVis, s: Math.round((state.mapTool === 'pen' ? 3 : 18) * b * sizeK()) || 1, p: [Math.round(pt.x), Math.round(pt.y)] };
+        // Width looks the same on screen at any zoom: zoomed in 3×, the line is 3× thinner on the map.
+        const b = mapBase(m), zoom = Math.max(1, dmViewer.s / dmViewer.fitS);
+        stroke = { k: state.mapTool, c: state.mapColor, vis: state.mapVis, s: Math.max(1, Math.round((state.mapTool === 'pen' ? 3 : 18) * b * sizeK() / zoom)), p: [Math.round(pt.x), Math.round(pt.y)] };
       }
       return true;
     },
