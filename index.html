@@ -45,6 +45,7 @@
     --good: #6cc490; --bad: #f08a6a; color-scheme: dark;
   }
 }
+:root[data-theme="light"] { color-scheme: only light; }
 :root[data-theme="dark"] {
   --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299;
   --line: #2c332e; --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f;
@@ -1367,6 +1368,12 @@ function syncThemeColor() {
   const m = document.createElement('meta'); m.name = 'theme-color';
   m.content = isDark() ? '#111412' : '#e7e9e1';
   document.head.appendChild(m);
+  // Light chosen in Settings: tell the browser not to recolour the page with its own dark mode
+  // (Samsung Internet and Chrome's auto-dark otherwise darken it on top of our light colours).
+  const only = document.documentElement.dataset.theme === 'light';
+  let cs = document.querySelector('meta[name="color-scheme"]');
+  if (!cs) { cs = document.createElement('meta'); cs.name = 'color-scheme'; document.head.prepend(cs); }
+  cs.content = only ? 'only light' : 'light dark';
 }
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeColor); } catch {}
 function isDark() {
