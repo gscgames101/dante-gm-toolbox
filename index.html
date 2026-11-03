@@ -1614,7 +1614,7 @@ function doRoll(expr, label, who) {
     const log = Array.isArray(state.enc.log) ? state.enc.log : [];
     state.enc.log = [{ id: uid(), who, label: label || 'Roll', pretty, rolls, total, crit, round: state.enc.round || 0, t: Date.now() }, ...log].slice(0, 20);
     encChanged();
-    schedulePlayersUpdate(450);  // straight to the players (an attack + damage tapped together go as one)
+    schedulePlayersUpdate(SITE ? 120 : 450);  // straight to the players (claude.ai: an attack + damage tapped together go as one reload)
   }
   // The dice tray is hidden under full-screen sheets, so show the result there too.
   if (document.querySelector('.sheet:not([hidden]):not(#sbSheet)')) toast(`${label || 'Roll'}: ${total}${crit === 'crit' ? ' (nat 20!)' : crit === 'fumble' ? ' (nat 1)' : ''}  ·  ${pretty} → [${rolls.join(', ')}]`);
@@ -2923,10 +2923,13 @@ function restoreScreen() {
 async function publishPlayers() {
   // Website: players watch one shared document, so their screens change instantly and nothing reloads.
   if (SITE) {
+    // Send first, then redraw this screen, so the players' update leaves as early as possible.
     const before = state.enc.pubAt || 0;
-    state.enc.pubAt = Date.now(); encChanged();
+    state.enc.pubAt = Date.now();
     const pub = publicEnc(); playersSentKey = JSON.stringify(pub);
-    try { await state.db.doc('public/current').set({ ...pub, at: Date.now() }); }
+    const write = state.db.doc('public/current').set({ ...pub, at: Date.now() });
+    encChanged();
+    try { await write; }
     catch { state.enc.pubAt = before; encChanged(); toast('Couldn’t update the players’ screen. It will try again on the next turn.'); }
     return;
   }
@@ -2992,7 +2995,7 @@ function checkPlayersScreen() {
   if (playersSentKey === null) { playersSentKey = key; return; }  // first look after opening: nothing changed yet
   if (key === playersSentKey) return;
   playersSentKey = key;
-  schedulePlayersUpdate(250);
+  schedulePlayersUpdate(120);
 }
 /* One roll on the players' screen: who rolled, what for, then the dice. Each on its own line, wrapping instead of cut off. */
 const pvRollText = r => `<span class="what">
@@ -3049,9 +3052,18 @@ function renderPlayerView(d) {
   if (now) now.scrollIntoView({ block: 'nearest' });
 }
 /* Player screen: shows the turn order baked into this version of the page (a new version replaces it). */
+/* Players' screen: keep the device awake. A dimmed or locked phone pauses the page, and updates then arrive late. */
+let wakeLock = null;
+async function keepAwake() {
+  if (!('wakeLock' in navigator) || document.visibilityState !== 'visible' || state.role !== 'player') return;
+  try { if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+}
 function showPlayers() {
   state.canWrite = false;
   setRole('player');
+  keepAwake();
+  document.addEventListener('visibilitychange', keepAwake);
+  document.addEventListener('pointerdown', keepAwake, { passive: true });  // some browsers only allow it after a tap
   if (SITE) {
     // Website: follow the DM's live turn order. The sign-in button is for the DM (hidden on the #players link).
     $('#pvSignin').hidden = location.hash === '#players';
