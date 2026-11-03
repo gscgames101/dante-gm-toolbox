@@ -307,6 +307,26 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .pv-wrap { max-width: 640px; margin: 0 auto; padding-block: 16px 32px; display: grid; gap: 14px; }
 .pv-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); border: 1px solid var(--accent); }
 .pv-banner span { flex: 1; font-weight: 700; }
+/* Initiative on the players' screen: turn order on the left, rolls on the right, each scrolling on its own.
+   Phones: one column (latest roll, turn order, earlier rolls). */
+.pv-cols, .pv-col { display: contents; }
+.pv-wrap > .pv-cols .pv-head { order: 1; }
+.pv-wrap > .pv-cols .pv-last, .pv-norolls { order: 2; }
+.pv-wrap > .pv-cols .pv-list, .pv-wrap > .pv-cols #pvEmpty { order: 3; }
+.pv-wrap > .pv-cols .pv-rolls { order: 4; }
+.pv-wrap > .pv-at, .pv-wrap > .pv-signin { order: 5; }
+.pv-head.pv-rolls-head, .pv-norolls { display: none; }
+.pv-norolls { margin: 0; color: var(--muted); }
+@media (min-width: 760px) {
+  .app[data-role="player"] main.player-view:not(.map-mode) { overflow: hidden; }
+  .pv-wrap { max-width: 1100px; height: 100%; display: flex; flex-direction: column; padding-bottom: 12px; }
+  .pv-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 28px; flex: 1; min-height: 0; }
+  .pv-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  .pv-col-rolls { border-left: 1px solid var(--line); padding-left: 24px; }
+  .pv-head.pv-rolls-head { display: flex; }
+  .pv-norolls:not([hidden]) { display: block; }
+  .pv-rolls h3 { margin-top: 0; }
+}
 .pv-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .pv-head h2 { font-family: var(--display); font-weight: 400; font-size: 1.8rem; color: var(--accent); }
 .pv-head .round b { font-size: 1.9rem; }
@@ -591,12 +611,8 @@ button.cb-pic { cursor: zoom-in; }
   .sheet-in { max-width: 960px; }
   /* Players' screen: no rolls yet = one centred column; with rolls = turn order on the left,
      latest + earlier rolls stacked on the right ("dense" lets the list fill the left beside them). */
-  .pv-wrap { max-width: 760px; }
-  .pv-wrap.has-rolls { max-width: 1280px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); column-gap: 32px; align-items: start; grid-auto-flow: row dense; }
-  .pv-wrap.has-rolls > * { grid-column: 1 / -1; }
-  .pv-wrap.has-rolls > .pv-list { grid-column: 1; grid-row: span 2; }
-  .pv-wrap.has-rolls > .pv-last, .pv-wrap.has-rolls > .pv-rolls { grid-column: 2; }
-  .pv-rolls h3 { margin-top: 0; }
+  .pv-wrap { max-width: 1280px; }
+  .pv-cols { column-gap: 40px; }
 }
 @media (min-width: 1500px) {
   .sb { columns: 2; column-gap: 40px; column-rule: 1px solid var(--line); }
@@ -762,17 +778,25 @@ button.cb-pic { cursor: zoom-in; }
         <span>This is what your players see.</span>
         <button type="button" class="btn small" data-act="pv-exit">Back to DM view</button>
       </div>
-      <div class="pv-head">
-        <h2>Initiative</h2>
-        <div class="round"><span>Round</span><b id="pvRound">—</b></div>
+      <div class="pv-cols">
+        <div class="pv-col pv-col-list">
+          <div class="pv-head">
+            <h2>Initiative</h2>
+            <div class="round"><span>Round</span><b id="pvRound">—</b></div>
+          </div>
+          <ol class="pv-list" id="pvList"></ol>
+          <div class="empty" id="pvEmpty"><h3>No fight yet</h3><p>The turn order appears here when your DM starts an encounter. It updates by itself.</p></div>
+        </div>
+        <div class="pv-col pv-col-rolls">
+          <div class="pv-head pv-rolls-head"><h2>Rolls</h2></div>
+          <section class="pv-last" id="pvLast" aria-live="polite" hidden></section>
+          <section class="pv-rolls" id="pvRollsWrap" hidden>
+            <h3>Earlier rolls</h3>
+            <ol id="pvRolls"></ol>
+          </section>
+          <p class="pv-norolls" id="pvNoRolls">No rolls yet. They show up here as your DM rolls.</p>
+        </div>
       </div>
-      <section class="pv-last" id="pvLast" aria-live="polite" hidden></section>
-      <ol class="pv-list" id="pvList"></ol>
-      <section class="pv-rolls" id="pvRollsWrap" hidden>
-        <h3>Earlier rolls</h3>
-        <ol id="pvRolls"></ol>
-      </section>
-      <div class="empty" id="pvEmpty"><h3>No fight yet</h3><p>The turn order appears here when your DM starts an encounter. It updates by itself.</p></div>
       <p class="pv-at" id="pvAt" hidden></p>
       <div class="pv-signin" id="pvSignin" hidden><button type="button" class="btn small ghost" data-act="dm-signin">DM sign in</button></div>
     </div>
@@ -2978,6 +3002,7 @@ function renderPlayerView(d) {
   const picOf = Object.fromEntries(list.filter(c => isAssetId(c.img)).map(c => [c.name, c]));
   // Newest roll: big, at the top, and it flashes when a new one arrives.
   document.querySelector('.pv-wrap').classList.toggle('has-rolls', allRolls.length > 0);
+  $('#pvNoRolls').hidden = allRolls.length > 0;
   const last = allRolls[0], lastEl = $('#pvLast');
   lastEl.hidden = !last;
   if (last) {
