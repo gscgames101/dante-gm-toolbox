@@ -450,6 +450,8 @@ button.cb-pic { cursor: zoom-in; }
 /* Header gear + settings */
 .icon-btn { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 0; }
 .icon-btn:hover { color: var(--accent); border-color: var(--line); }
+#fsBtn .fs-off, #fsBtn.on .fs-on { display: none; }
+#fsBtn.on .fs-off { display: inline; }
 .set-dlg { max-width: 440px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .set-row.col { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -584,6 +586,9 @@ button.cb-pic { cursor: zoom-in; }
       <h1>Dante's GM Toolbox</h1>
       <span class="sync" id="sync" data-state="idle">Connecting…</span>
     </div>
+    <button type="button" class="icon-btn" id="fsBtn" data-act="fullscreen" aria-label="Full screen" title="Full screen" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path class="fs-on" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path class="fs-off" d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>
+    </button>
     <button type="button" class="icon-btn" data-act="set-open" aria-label="Settings" title="Settings">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z"/></svg>
     </button>
@@ -3548,6 +3553,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'pv-fit': if (pvViewer) pvViewer.fit(); break;
+    case 'fullscreen': toggleFullscreen(); break;
     case 'dm-signin': SITE.signIn().catch(() => toast('Sign-in didn’t finish. Try again.')); break;
     case 'dm-signout': SITE.signOut(); break;
     case 'site-export': exportForSite(); break;
@@ -4280,6 +4286,30 @@ function renderPvTab() {
   requestAnimationFrame(() => { if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
 }
 
+/* ---------- full screen ---------- */
+// Hidden where the browser can't do it (iPhone Safari, or inside a frame that doesn't allow it).
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  const p = fsEl()
+    ? (d.exitFullscreen || d.webkitExitFullscreen).call(d)
+    : (el.requestFullscreen || el.webkitRequestFullscreen).call(el, { navigationUI: 'hide' });
+  if (p && p.catch) p.catch(() => toast('This browser didn’t allow full screen.'));
+}
+function syncFullscreen() {
+  const b = $('#fsBtn'); if (!b) return;
+  const on = !!fsEl(), label = on ? 'Exit full screen' : 'Full screen';
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', label); b.title = label;
+}
+function setupFullscreen() {
+  const b = $('#fsBtn'); if (!b) return;
+  b.hidden = !(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  document.addEventListener('webkitfullscreenchange', syncFullscreen);
+  syncFullscreen();
+}
+
 /* ---------- boot ---------- */
 async function waitForClaude() {
   for (let i = 0; i < 25; i++) {
@@ -4374,6 +4404,7 @@ renderList(); renderDetail(); renderTray();
 state.shownMap = ls.get('pb-shown-map', null);
 setTab(['init', 'maps'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
+setupFullscreen();
 if (!playerLink) restoreScreen();
 if (playerLink) showPlayers(); else connect();
 })();
