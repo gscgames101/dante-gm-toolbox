@@ -257,7 +257,7 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
   box-shadow: inset 7px 0 0 var(--spine), inset 9px 0 0 var(--spine-hi), 3px 4px 10px #0000002e; transition: transform .15s ease; }
 .book::after { content: ""; position: absolute; top: 6px; bottom: 6px; right: -4px; width: 4px; border-radius: 0 2px 2px 0;
   background: repeating-linear-gradient(to bottom, var(--page-a) 0 2px, var(--page-b) 2px 3px); }
-.book-title { font-family: var(--display); font-size: 1rem; line-height: 1.12; overflow-wrap: anywhere; padding: 5px 0;
+.book-title { font-family: var(--display); font-size: 1rem; line-height: 1.12; overflow-wrap: normal; word-break: normal; hyphens: manual; padding: 5px 0;
   border-top: 1px solid var(--cover-rule); border-bottom: 1px solid var(--cover-rule);
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .book-count { font-family: var(--mono); font-size: .74rem; opacity: .8; }
@@ -1390,6 +1390,27 @@ function renderSettings() {
   if (who) $('#acctTxt').textContent = who.email || '';
 }
 applyPrefs();
+
+/* Book covers: titles wrap only between words. If a word (or the whole title) doesn't fit the cover,
+   the title's text shrinks a little at a time until it does. */
+function fitBookTitles() {
+  document.querySelectorAll('.book-title').forEach(el => {
+    if (!el.offsetWidth) return;  // not on screen
+    el.style.fontSize = '';
+    let fs = parseFloat(getComputedStyle(el).fontSize), min = fs * 0.55;
+    while ((el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) && fs > min) {
+      fs -= 0.5; el.style.fontSize = fs + 'px';
+    }
+  });
+}
+let fitBooksT = 0;
+const fitBooksSoon = () => { cancelAnimationFrame(fitBooksT); fitBooksT = requestAnimationFrame(fitBookTitles); };
+new MutationObserver(list => {
+  if (list.some(r => [...r.addedNodes].some(n => n.nodeType === 1 && (n.matches('.book, .book-title') || n.querySelector('.book-title'))) || (r.target.closest && r.target.closest('.book-title')))) fitBooksSoon();
+}).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+addEventListener('resize', fitBooksSoon);
+document.addEventListener('click', fitBooksSoon, true);  // shelves that were hidden (other tab, closed sheet) get fitted once shown
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitBooksSoon);
 
 /* ---------- normalize ---------- */
 const str = v => (v == null ? '' : String(v)).trim();
