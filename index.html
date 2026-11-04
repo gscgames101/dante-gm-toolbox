@@ -126,6 +126,19 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .cr b { display: block; font-family: var(--mono); font-size: 1rem; color: var(--accent); }
 .cr span { font-size: .74rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .list-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 8px 20px; color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); }
+.foot-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* PDF import */
+.pdf-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pdf-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pdf-tools .spacer { flex: 1; }
+.pdf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pdf-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.pdf-item input[type="checkbox"] { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
+.pdf-item .txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.pdf-item .txt b { overflow-wrap: anywhere; }
+.pdf-item .txt span { font-size: .82rem; color: var(--muted); }
+.pdf-item .txt .warn { color: var(--bad); }
+.pdf-item.off { opacity: .6; }
 .empty { padding: 28px 4px; color: var(--muted); }
 .empty h3 { font-family: var(--display); font-weight: 400; font-size: 1.3rem; color: var(--ink); margin-bottom: 6px; }
 
@@ -688,7 +701,10 @@ button.cb-pic { cursor: zoom-in; }
       <div class="empty" id="empty" hidden></div>
       <div class="list-foot">
         <span id="count"></span>
-        <button class="btn small ghost" data-act="backup">Backup &amp; import</button>
+        <span class="foot-btns">
+          <button class="btn small ghost" data-act="pdf-open" id="pdfBtn" hidden>Import PDF</button>
+          <button class="btn small ghost" data-act="backup">Backup &amp; import</button>
+        </span>
       </div>
     </section>
 
@@ -992,6 +1008,47 @@ button.cb-pic { cursor: zoom-in; }
     </fieldset>
     <p class="hint">Dice like <b>2d6 + 3</b> and attack bonuses like <b>+5 to hit</b> become tap-to-roll buttons in the stat block.</p>
   </form>
+</div>
+
+<div class="sheet" id="pdfSheet" hidden>
+  <div class="sheet-in gutter">
+    <div class="sheet-head">
+      <button type="button" class="btn ghost" data-act="pdf-close">Close</button>
+      <h2>Import from PDF</h2>
+    </div>
+    <fieldset>
+      <legend>1. Pick the PDF</legend>
+      <p class="hint" style="margin:0">Claude reads each page of your own PDF and finds the stat blocks on it. Each page is one request on your Claude usage and takes about 20–60 seconds, so try a few pages first.</p>
+      <div class="pdf-row">
+        <label class="btn file-btn" for="pdfFile"><span>Choose a PDF</span><input id="pdfFile" type="file" accept="application/pdf,.pdf"></label>
+        <span class="hint" id="pdfInfo">No file yet.</span>
+      </div>
+    </fieldset>
+    <fieldset id="pdfSetup" disabled>
+      <legend>2. Pages and book</legend>
+      <div class="grid">
+        <div class="field"><label for="pdfFrom">From page</label><input id="pdfFrom" type="number" min="1" inputmode="numeric"></div>
+        <div class="field"><label for="pdfTo">To page</label><input id="pdfTo" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="pdfBook">Put the monsters in</label><select id="pdfBook"></select></div>
+      <div class="field" id="pdfNewBookField" hidden><label for="pdfNewBook">New book's name</label><input id="pdfNewBook" maxlength="40" placeholder="e.g. Volo"></div>
+      <div class="row-end">
+        <button type="button" class="btn ghost" data-act="pdf-stop" id="pdfStop" hidden>Stop</button>
+        <button type="button" class="btn primary" data-act="pdf-start" id="pdfStart">Read pages</button>
+      </div>
+      <p class="hint" id="pdfStatus" style="margin:0" hidden></p>
+    </fieldset>
+    <fieldset id="pdfResults" hidden>
+      <legend>3. Check and save</legend>
+      <p class="hint" style="margin:0">Untick anything you don’t want. Monsters already in your bestiary start unticked. <b>Edit</b> opens one in the editor first.</p>
+      <div class="pdf-tools"><button type="button" class="btn small ghost" data-act="pdf-all">Tick all</button><button type="button" class="btn small ghost" data-act="pdf-none">Untick all</button><span class="spacer"></span><span class="hint" id="pdfCount"></span></div>
+      <ul class="pdf-list" id="pdfList"></ul>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="pdf-discard">Discard list</button>
+        <button type="button" class="btn primary" data-act="pdf-save" id="pdfSave">Save ticked</button>
+      </div>
+    </fieldset>
+  </div>
 </div>
 
 <div class="sheet" id="backup" hidden>
@@ -2410,6 +2467,8 @@ function closeEditor() {
   $('#editor').hidden = true;
   state.edUploaded.forEach(id => dropAsset(id));
   state.edUploaded = [];
+  // Discarded a monster opened from the PDF import: it goes back on the import list.
+  if (pdfImp.editing) { pdfImp.editing.saved = false; pdfImp.editing = null; renderPdfFound(); $('#pdfSheet').hidden = false; }
 }
 function readEditor() {
   const o = {};
@@ -2461,6 +2520,8 @@ async function saveEditor(ev) {
     leftovers.forEach(id => dropAsset(id, ref.id));
     toast(existing ? 'Saved' : `Added ${data.name}`);
     openMonster(ref.id);
+    // Saved a monster opened from the PDF import: back to the import list if more are waiting.
+    if (pdfImp.editing) { pdfImp.editing = null; if (pdfImp.found.some(f => !f.saved)) { renderPdfFound(); $('#pdfSheet').hidden = false; } }
   } catch (e) {
     showErr('#edErr', saveErrorText(e));
   } finally { btn.disabled = false; btn.textContent = 'Save'; }
@@ -2684,6 +2745,206 @@ async function readPicture(file) {
     $('#pasteStop').hidden = true; $('#pasteGo').disabled = false;
   }
 }
+
+/* ---------- PDF import (claude.ai) ----------
+   The DM picks their own PDF. pdf.js turns each page into pictures right here in the browser, Claude transcribes the
+   stat blocks on it (same layout as the picture reader), and the normal importer turns the text into monsters.
+   Nothing is saved until the DM ticks what they want and taps Save. */
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const pdfImp = { lib: null, doc: null, name: '', pages: 0, found: [], running: false, stop: false, ctl: null, next: 0, editing: null };
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load')); document.head.appendChild(s); });
+let pdfLibP = null;
+function loadPdfLib() {
+  // The worker script is loaded first, so pdf.js runs on this page instead of a separate worker (claude.ai can block those).
+  if (!pdfLibP) pdfLibP = (async () => {
+    await loadScript(PDFJS + 'pdf.worker.min.js');
+    await loadScript(PDFJS + 'pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+    return window.pdfjsLib;
+  })().catch(e => { pdfLibP = null; throw e; });
+  return pdfLibP;
+}
+const pdfStatus = (t, err) => { const s = $('#pdfStatus'); s.hidden = !t; s.className = err ? 'err' : 'hint'; s.textContent = t || ''; };
+function openPdfImport() {
+  const sel = $('#pdfBook'), cur = state.book !== 'all' ? state.book : (sel.value || '');
+  sel.innerHTML = sortedBooks().map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('') + '<option value="__new">+ A new book…</option>';
+  const volo = state.books.find(b => /volo/i.test(b.name));
+  sel.value = state.books.some(b => b.id === cur) ? cur : volo ? volo.id : state.books.length ? sortedBooks()[0].id : '__new';
+  $('#pdfNewBookField').hidden = sel.value !== '__new';
+  renderPdfFound();
+  $('#pdfSheet').hidden = false;
+}
+async function pickPdf(file) {
+  if (!file) return;
+  if (!/pdf$/i.test(file.type) && !/\.pdf$/i.test(file.name)) { $('#pdfInfo').textContent = 'That isn’t a PDF.'; return; }
+  $('#pdfInfo').textContent = 'Opening…'; $('#pdfSetup').disabled = true;
+  try {
+    const lib = await loadPdfLib();
+    if (pdfImp.doc) { try { pdfImp.doc.destroy(); } catch {} }
+    pdfImp.doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    pdfImp.lib = lib; pdfImp.name = file.name; pdfImp.pages = pdfImp.doc.numPages; pdfImp.next = 0;
+    $('#pdfInfo').textContent = `${file.name} · ${pdfImp.pages} page${pdfImp.pages === 1 ? '' : 's'}`;
+    $('#pdfFrom').value = 1; $('#pdfFrom').max = $('#pdfTo').max = pdfImp.pages;
+    $('#pdfTo').value = Math.min(pdfImp.pages, 3);
+    $('#pdfStart').textContent = 'Read pages';
+    $('#pdfSetup').disabled = false; pdfStatus('');
+  } catch (e) {
+    $('#pdfInfo').textContent = e && e.message === 'load' ? 'Couldn’t load the PDF reader. Check your connection and try again.' : 'Couldn’t open that PDF. It may be damaged or password-protected.';
+  }
+}
+/* One page as pictures: top and bottom halves (overlapping a little) so small print stays readable after Claude's downsizing. */
+async function pdfPageImages(n) {
+  const page = await pdfImp.doc.getPage(n);
+  const base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: Math.min(3, 2000 / base.width) });
+  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  await page.render({ canvasContext: g, viewport: vp }).promise;
+  page.cleanup();
+  const parts = (pdfImp.maxImages || 1) >= 2 ? 2 : 1, ov = parts > 1 ? Math.round(c.height * 0.04) : 0, out = [];
+  for (let i = 0; i < parts; i++) {
+    const y0 = Math.max(0, Math.round(i * c.height / parts - ov)), y1 = Math.min(c.height, Math.round((i + 1) * c.height / parts + ov));
+    const p = document.createElement('canvas'); p.width = c.width; p.height = y1 - y0;
+    p.getContext('2d').drawImage(c, 0, y0, c.width, y1 - y0, 0, 0, c.width, y1 - y0);
+    out.push(await new Promise(r => p.toBlob(r, 'image/jpeg', 0.88)));
+  }
+  return out;
+}
+const pdfPrompt = (n, parts) => (parts > 1
+  ? `These ${parts} images are the top and bottom halves of page ${n} of a D&D 5e book that I own (they overlap a little; don't repeat the overlapping lines). `
+  : `This image is page ${n} of a D&D 5e book that I own. `)
+  + 'I am typing its creature stat blocks into my personal GM app. Transcribe every creature stat block on the page, in reading order '
+  + '(for two columns: the left column top to bottom, then the right column). For each stat block use this layout: the name on the first line; then size, type and alignment; '
+  + 'then Armor Class, Hit Points and Speed lines; then a line "STR DEX CON INT WIS CHA" followed by one line with the six scores written like "18 (+4)"; '
+  + 'then the remaining header lines (Saving Throws, Skills, Damage Vulnerabilities/Resistances/Immunities, Condition Immunities, Senses, Languages, Challenge), each on its own line; '
+  + 'then each trait as "Name. text"; then the section headings (Actions, Bonus Actions, Reactions, Legendary Actions, Lair Actions) each on its own line, with every entry as "Name. text". '
+  + 'Join words that were split across lines. Put a line containing only ===== between two stat blocks. '
+  + 'If the top of the page continues a stat block that began on an earlier page (it has no name or header lines), transcribe that part first and start it with a line containing only CONTINUED. '
+  + 'Leave out everything that isn\'t part of a stat block (stories, lore, tables, page headers and numbers). Output only the transcriptions, with no commentary or markdown. '
+  + 'If the page has no stat block at all, reply with exactly: NO STAT BLOCK';
+function pdfParse(item) {
+  const { raw, found } = parseStatBlock(item.text);
+  item.ok = !!raw.name && found.length >= 2;
+  if (!item.ok) return;
+  item.m = normalize(raw);
+  item.missing = ['ability scores', 'armor class', 'hit points', 'challenge rating'].filter(x => !found.includes(x));
+}
+function pdfAddPage(text, n) {
+  if (/^\s*NO STAT BLOCK\s*$/i.test(text)) return 0;
+  let added = 0;
+  for (let part of text.split(/^\s*={3,}\s*$/m).map(s => s.trim()).filter(Boolean)) {
+    const cont = /^CONTINUED\s*$/im.test(part.split('\n')[0]);
+    if (cont) {
+      part = part.replace(/^CONTINUED\s*\n?/i, '');
+      const last = pdfImp.found[pdfImp.found.length - 1];
+      if (last && !last.saved) { last.text += '\n' + part; pdfParse(last); continue; }
+    }
+    const item = { text: part, page: n };
+    pdfParse(item);
+    if (!item.ok) continue;
+    item.dup = state.monsters.some(x => x.name.toLowerCase() === item.m.name.toLowerCase()) || pdfImp.found.some(f => f.m && f.m.name.toLowerCase() === item.m.name.toLowerCase());
+    item.sel = !item.dup;
+    pdfImp.found.push(item); added++;
+  }
+  return added;
+}
+async function runPdfImport() {
+  if (pdfImp.running || !pdfImp.doc) return;
+  if (!state.sample || !state.sampleImages) { pdfStatus('Reading pictures isn’t available here. Use the toolbox on claude.ai.', true); return; }
+  const from = Math.max(1, Math.min(pdfImp.pages, parseInt($('#pdfFrom').value, 10) || 1));
+  const to = Math.max(from, Math.min(pdfImp.pages, parseInt($('#pdfTo').value, 10) || from));
+  if ($('#pdfBook').value === '__new' && !str($('#pdfNewBook').value)) { pdfStatus('Give the new book a name.', true); $('#pdfNewBook').focus(); return; }
+  try { const lim = await state.sample.limits(); pdfImp.maxImages = (lim && lim.images && lim.images.maxCount) || 1; } catch { pdfImp.maxImages = 1; }
+  pdfImp.running = true; pdfImp.stop = false;
+  $('#pdfStart').disabled = true; $('#pdfStop').hidden = false; $('#pdfFile').disabled = true;
+  let n = from, total = to - from + 1;
+  try {
+    for (; n <= to && !pdfImp.stop; n++) {
+      pdfStatus(`Reading page ${n} (${n - from + 1} of ${total})… ${pdfImp.found.length} monster${pdfImp.found.length === 1 ? '' : 's'} found so far.`);
+      const imgs = await pdfPageImages(n);
+      pdfImp.ctl = new AbortController();
+      const { text } = await state.sample(pdfPrompt(n, imgs.length), { images: imgs, signal: pdfImp.ctl.signal });
+      pdfAddPage(text, n);
+      renderPdfFound();
+    }
+    pdfImp.next = n <= to ? n : 0;
+    pdfStatus(pdfImp.stop && n <= to ? `Stopped before page ${n}. Tap Continue to carry on.` : `Done: read pages ${from}–${to}. ${pdfImp.found.length} monster${pdfImp.found.length === 1 ? '' : 's'} in the list.`);
+  } catch (e) {
+    const c = e && e.code;
+    pdfImp.next = n;
+    if (c === 'cancelled') pdfStatus(`Stopped on page ${n}. Tap Continue to carry on.`);
+    else pdfStatus((c === 'rate_limited' ? 'Claude is busy (too many requests). Wait a minute, then tap Continue.'
+      : c === 'not_granted' || c === 'sampling_disabled' ? 'Claude isn’t allowed to read pictures for this app.'
+      : c === 'image_rejected' ? `Page ${n} couldn’t be sent as a picture.`
+      : c === 'refused' ? `Claude couldn’t read page ${n}. Set “From page” to ${n + 1} to skip it.`
+      : c === 'session_expired' ? 'Your Claude session expired. Sign in again, then tap Continue.'
+      : `Something went wrong on page ${n}. Tap Continue to try again.`) + ` (Stopped at page ${n}.)`, true);
+  } finally {
+    pdfImp.running = false; pdfImp.ctl = null;
+    $('#pdfStart').disabled = false; $('#pdfStop').hidden = true; $('#pdfFile').disabled = false;
+    if (pdfImp.next) { $('#pdfFrom').value = pdfImp.next; $('#pdfStart').textContent = 'Continue'; }
+    else $('#pdfStart').textContent = 'Read pages';
+  }
+}
+function renderPdfFound() {
+  const list = pdfImp.found.filter(f => !f.saved);
+  $('#pdfResults').hidden = !list.length;
+  const sel = list.filter(f => f.sel).length;
+  $('#pdfCount').textContent = `${sel} of ${list.length} ticked`;
+  $('#pdfSave').disabled = !sel;
+  $('#pdfSave').textContent = sel ? `Save ${sel} monster${sel === 1 ? '' : 's'}` : 'Save ticked';
+  $('#pdfList').innerHTML = pdfImp.found.map((f, i) => f.saved ? '' : `<li class="pdf-item${f.sel ? '' : ' off'}">
+      <input type="checkbox" data-pdfsel="${i}"${f.sel ? ' checked' : ''} aria-label="Save ${esc(f.m.name)}">
+      <span class="txt"><b>${esc(f.m.name)}</b>
+        <span>${esc([f.m.size, f.m.type].filter(Boolean).join(' '))}${f.m.cr ? ` · CR ${esc(f.m.cr)}` : ''} · page ${f.page}${f.dup ? ' · already in your bestiary' : ''}</span>
+        ${f.missing.length ? `<span class="warn">Couldn’t find: ${esc(f.missing.join(', '))}</span>` : ''}</span>
+      <button type="button" class="btn small ghost" data-pdfedit="${i}">Edit</button>
+    </li>`).join('');
+}
+async function pdfTargetBook() {
+  const v = $('#pdfBook').value;
+  if (v !== '__new') return v;
+  const [id] = await bookIdsByName([$('#pdfNewBook').value]);
+  openPdfImport();  // the new book now shows in the list
+  $('#pdfBook').value = id; $('#pdfNewBookField').hidden = true;
+  return id;
+}
+async function savePdfFound() {
+  if (!state.db || !state.canWrite) return;
+  const todo = pdfImp.found.filter(f => f.sel && !f.saved);
+  if (!todo.length) return;
+  if ($('#pdfBook').value === '__new' && !str($('#pdfNewBook').value)) { pdfStatus('Give the new book a name.', true); $('#pdfNewBook').focus(); return; }
+  $('#pdfSave').disabled = true;
+  let ok = 0;
+  try {
+    const book = await pdfTargetBook();
+    for (const f of todo) {
+      await state.db.collection('monsters').doc().set(normalize({ ...f.m, bookIds: book ? [book] : [] }));
+      f.saved = true; ok++;
+      pdfStatus(`Saving… ${ok} of ${todo.length}`);
+    }
+    pdfStatus(`Saved ${ok} monster${ok === 1 ? '' : 's'}.`);
+    toast(`Saved ${ok} monster${ok === 1 ? '' : 's'} from the PDF`);
+  } catch (e) { pdfStatus(`Saved ${ok} of ${todo.length}. ${saveErrorText(e)}`, true); }
+  renderPdfFound();
+}
+async function editPdfFound(i) {
+  const f = pdfImp.found[i]; if (!f) return;
+  let book = '';
+  try { book = await pdfTargetBook(); } catch {}
+  f.saved = true; pdfImp.editing = f;  // off the list while in the editor; back on it if the DM discards
+  renderPdfFound();
+  $('#pdfSheet').hidden = true;
+  openEditor(normalize({ ...f.m, bookIds: book ? [book] : [] }), null);
+  setTimeout(() => { state.edBaseline = ''; }, 0);  // counts as unsaved until the DM saves
+}
+$('#pdfFile').addEventListener('change', e => { pickPdf(e.target.files[0]); e.target.value = ''; });
+$('#pdfBook').addEventListener('change', e => { $('#pdfNewBookField').hidden = e.target.value !== '__new'; });
+$('#pdfList').addEventListener('change', e => {
+  const i = e.target.dataset.pdfsel; if (i == null) return;
+  pdfImp.found[i].sel = e.target.checked; renderPdfFound();
+});
+$('#pdfList').addEventListener('click', e => { const b = e.target.closest('[data-pdfedit]'); if (b) editPdfFound(+b.dataset.pdfedit); });
+addEventListener('beforeunload', e => { if (pdfImp.running || pdfImp.found.some(f => !f.saved && f.sel)) { e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- DM notes auto-format ---------- */
 // Tidies text pasted from PDFs and websites: rejoins broken lines, fixes split words, neat bullets, clean spacing.
@@ -3837,6 +4098,14 @@ document.addEventListener('click', async ev => {
     }
     case 'hpreset': if (m) { ls.set(hpKey(m.id), null); renderHp(m); } break;
     case 'backup': openBackup(); break;
+    case 'pdf-open': openPdfImport(); break;
+    case 'pdf-close': $('#pdfSheet').hidden = true; break;
+    case 'pdf-start': runPdfImport(); break;
+    case 'pdf-stop': if (pdfImp.ctl) pdfImp.ctl.abort(); pdfImp.stop = true; break;
+    case 'pdf-all': pdfImp.found.forEach(f => f.sel = true); renderPdfFound(); break;
+    case 'pdf-none': pdfImp.found.forEach(f => f.sel = false); renderPdfFound(); break;
+    case 'pdf-discard': if (confirm('Discard the monsters found so far?')) { pdfImp.found = []; renderPdfFound(); } break;
+    case 'pdf-save': savePdfFound(); break;
     case 'close-backup': $('#backup').hidden = true; break;
     case 'base-pick': startFromMonster(t.dataset.id); break;
   }
@@ -4550,6 +4819,7 @@ async function connect() {
     state.sampleImages = !!(lim && lim.images);
   } catch { state.sample = null; state.sampleImages = false; }
   $('#pasteImgRow').hidden = !state.sampleImages;
+  $('#pdfBtn').hidden = !state.sampleImages || !state.canWrite;
   if (unsentRolls()) schedulePlayersUpdate(800);
   if (user) {
     try { const w = await user.can('data.write'); if (w === false) setReadOnly(); } catch {}
