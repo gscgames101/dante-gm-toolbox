@@ -3054,6 +3054,8 @@ async function importFile(file) {
   try { data = JSON.parse(await file.text()); } catch { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
   // A 5etools bestiary file ({"monster": [...]}) from the DM's own copy: converted and added to the matching book.
   if (data && Array.isArray(data.monster)) { importFiveTools(data); return; }
+  // A 5etools legendary groups file: fills in missing lair actions (and regional effects) on monsters already here.
+  if (data && Array.isArray(data.legendaryGroup)) { importLairs(data.legendaryGroup); return; }
   // Older backups: one monster, or a plain list of monsters. Each is added as a new entry.
   if (Array.isArray(data) || (data && !data.format && data.name)) {
     const list = (Array.isArray(data) ? data : [data]).filter(x => x && typeof x === 'object' && x.name);
@@ -3190,6 +3192,56 @@ function importFiveTools(data) {
   const skipped = all.length - list.length;
   showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from ${title} to the book “${bookName}”${match ? '' : ' (a new book)'}?`
     + (skipped ? ` ${skipped} already in that book are skipped.` : '') + ' Nothing is replaced.', 'Add', () => addMonsterList(list));
+}
+
+/* 5etools legendary groups: lairActions = intro text, then a list of actions (some named, most not). */
+function ftLair(g) {
+  const intro = [], items = [];
+  const add = (name, desc) => { name = name.replace(/[.:]\s*$/, ''); if (name || desc) items.push({ name, desc }); };
+  const walk = arr => (Array.isArray(arr) ? arr : []).forEach(e => {
+    if (typeof e === 'string') { if (items.length) add('', ftText(e)); else intro.push(ftText(e)); }
+    else if (e && e.type === 'list') (e.items || []).forEach(i => typeof i === 'string' ? add('', ftText(i)) : add(ftText(i.name || ''), ftEntries(i.entry != null ? i.entry : i.entries)));
+    else if (e && e.name) add(ftText(e.name), ftEntries(e.entries));
+    else if (e && Array.isArray(e.entries)) walk(e.entries);
+    else { const t = ftEntries(e); if (t) items.length ? add('', t) : intro.push(t); }
+  });
+  walk(g.lairActions);
+  return { lairIntro: intro.filter(Boolean).join('\n'), lair: items };
+}
+function importLairs(groups) {
+  const byName = new Map(groups.filter(g => g && g.name).map(g => [g.name.toLowerCase(), g]));
+  const todo = [];
+  let already = 0;
+  for (const m of state.monsters) {
+    const g = byName.get(m.name.toLowerCase());
+    if (!g || !(g.lairActions || g.regionalEffects)) continue;
+    const { lair, lairIntro } = ftLair(g);
+    const regional = ftEntries(g.regionalEffects);
+    const needLair = !(m.lair && m.lair.length) && lair.length;
+    const needRegional = regional && !/regional effects/i.test(m.notes || '');
+    if (!needLair && !needRegional) { already++; continue; }
+    todo.push({ m, lair: needLair ? lair : null, lairIntro, regional: needRegional ? regional : '' });
+  }
+  if (!todo.length) {
+    siteMsg('#siteImportMsg', already ? `All ${already} matching monsters already have their lair actions.` : 'None of the monsters in this file are in your bestiary yet. Import their books first.');
+    return;
+  }
+  const names = todo.map(t => t.m.name), shown = names.slice(0, 25).join(', ') + (names.length > 25 ? ` and ${names.length - 25} more` : '');
+  showConfirm(`Add lair actions to ${todo.length} monster${todo.length === 1 ? '' : 's'}: ${shown}?`
+    + `${already ? ` ${already} already ${already === 1 ? 'has them and is' : 'have them and are'} left alone.` : ''} Regional effects go in their notes. Nothing else changes.`, 'Add', async () => {
+    let ok = 0;
+    try {
+      for (const t of todo) {
+        const m = t.m, next = { ...m };
+        if (t.lair) { next.lair = t.lair; next.lairIntro = t.lairIntro; }
+        if (t.regional) next.notes = [m.notes, 'Regional effects\n' + t.regional].filter(Boolean).join('\n\n');
+        await state.db.collection('monsters').doc(m.id).set(normalize(next));
+        siteMsg('#siteImportMsg', `Adding lair actions… ${++ok} of ${todo.length}`);
+      }
+      siteMsg('#siteImportMsg', `Added lair actions to ${ok} monster${ok === 1 ? '' : 's'}.`);
+      toast(`Lair actions added to ${ok} monster${ok === 1 ? '' : 's'}`);
+    } catch (e) { siteMsg('#siteImportMsg', `Updated ${ok} of ${todo.length}. ${saveErrorText(e)}`, true); }
+  });
 }
 
 /* A monster in an import file can name its books ("books": ["WOW"]): it's filed in the book with that name,
