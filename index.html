@@ -85,6 +85,7 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .pane { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .app[data-view="list"] #detailPane { display: none; }
 .app[data-view="detail"] #listPane { display: none; }
+.detail-bar .sb-close { display: none; width: 34px; height: 34px; }  /* wide screens only; phones have "← List" */
 /* Monster and map lists: books + search stay put on top; only the list below scrolls (with its own scrollbar). */
 #listPane, .map-list-pane { display: flex; flex-direction: column; overflow: hidden; }
 #listPane > .list-tools, .map-list-pane > .list-tools { flex: none; position: static; }
@@ -96,6 +97,7 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
   .app[data-view] #listPane { display: flex; }
   #listPane { border-right: 1px solid var(--line); }
   .back { display: none !important; }
+  .detail-bar .sb-close { display: grid; }
 }
 
 /* List */
@@ -1994,6 +1996,7 @@ function renderDetail() {
       ${state.canWrite ? `<button class="btn small" data-act="edit">Edit</button>
       <button class="btn small" data-act="dup">Duplicate</button>
       <button class="btn small danger" data-act="delete">Delete</button>` : ''}
+      <button class="icon-btn sb-close" data-act="close-sb" aria-label="Close stat block" title="Close stat block"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>` + sbHtml(m, true);
   renderHp(m);
 }
@@ -4186,6 +4189,7 @@ document.addEventListener('click', async ev => {
     case 'add-speed': addSpeedRow(null, true); break;
     case 'pic-remove': state.edImage = ''; state.edThumb = ''; renderPic(); break;
     case 'back': setView('list'); break;
+    case 'close-sb': state.selectedId = null; setView('list'); renderList(); renderDetail(); break;
     case 'delete': if (m) { state.pendingDelete = m.id; showConfirm(`Delete ${m.name}? This removes it from every device.`, 'Delete', null); } break;
     case 'confirm-no': $('#confirm').hidden = true; state.pendingDelete = null; state.confirmFn = null; break;
     case 'turn-next': moveTurn(1); break;
