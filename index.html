@@ -3052,6 +3052,8 @@ async function importFile(file) {
   if (!state.db) { siteMsg('#siteImportMsg', 'Not connected, so nothing was imported.', true); return; }
   let data;
   try { data = JSON.parse(await file.text()); } catch { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
+  // A 5etools bestiary file ({"monster": [...]}) from the DM's own copy: converted and added to the matching book.
+  if (data && Array.isArray(data.monster)) { importFiveTools(data); return; }
   // Older backups: one monster, or a plain list of monsters. Each is added as a new entry.
   if (Array.isArray(data) || (data && !data.format && data.name)) {
     const list = (Array.isArray(data) ? data : [data]).filter(x => x && typeof x === 'object' && x.name);
@@ -3068,6 +3070,128 @@ async function importFile(file) {
   if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps));
   else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps));
 }
+/* ---------- 5etools files ----------
+   5etools stores monsters as structured data with its own {@tag ...} markup in the text. This turns each one
+   into the app's format (the same shape the editor and the stat block reader produce). */
+const FT_SIZE = { T: 'Tiny', S: 'Small', M: 'Medium', L: 'Large', H: 'Huge', G: 'Gargantuan' };
+const FT_ALIGN = { L: 'lawful', N: 'neutral', NX: 'neutral', NY: 'neutral', C: 'chaotic', G: 'good', E: 'evil', U: 'unaligned', A: 'any alignment' };
+const FT_ATK = { mw: 'Melee Weapon Attack:', rw: 'Ranged Weapon Attack:', 'mw,rw': 'Melee or Ranged Weapon Attack:', 'rw,mw': 'Melee or Ranged Weapon Attack:', ms: 'Melee Spell Attack:', rs: 'Ranged Spell Attack:', 'ms,rs': 'Melee or Ranged Spell Attack:' };
+const capFirst = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+function ftText(s) {
+  // {@atk mw} → "Melee Weapon Attack:", {@hit 5} → "+5", {@h} → "Hit: ", {@dc 13} → "DC 13", {@recharge 5} → "(Recharge 5–6)",
+  // anything else like {@spell fireball} or {@creature goblin|MM|goblins} → its shown text.
+  let t = String(s == null ? '' : s), prev;
+  do {
+    prev = t;
+    t = t.replace(/\{@(\w+)\s*([^{}]*)\}/g, (_, tag, body) => {
+      body = body.trim();
+      switch (tag) {
+        case 'atk': return FT_ATK[body] || 'Attack:';
+        case 'hit': return (/^[+-]/.test(body) ? '' : '+') + body;
+        case 'h': return 'Hit: ';
+        case 'm': return 'Miss: ';
+        case 'dc': return 'DC ' + body;
+        case 'recharge': return body ? `(Recharge ${body}${body === '6' ? '' : '–6'})` : '(Recharge 6)';
+        case 'chance': return body.split('|')[0] + '%';
+        default: { const p = body.split('|'); return p[2] || p[0]; }
+      }
+    });
+  } while (t !== prev);
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
+// Entries can be strings, lists, named items, tables or nested blocks: flatten to text, one paragraph per line.
+function ftEntries(e) {
+  if (e == null) return '';
+  if (typeof e === 'string' || typeof e === 'number') return ftText(e);
+  if (Array.isArray(e)) return e.map(ftEntries).filter(Boolean).join('\n');
+  if (e.type === 'list') return (e.items || []).map(i => '• ' + ftEntries(i)).join('\n');
+  if (e.type === 'item' || e.type === 'itemSub') return (e.name ? ftText(e.name) + ' ' : '') + ftEntries(e.entry != null ? e.entry : e.entries);
+  if (e.type === 'table') return (e.rows || []).map(r => (Array.isArray(r) ? r : r.row || []).map(ftEntries).join(' — ')).join('\n');
+  if (e.entries) return (e.name ? ftText(e.name) + '. ' : '') + ftEntries(e.entries);
+  if (e.entry) return ftEntries(e.entry);
+  return '';
+}
+const ftSection = a => (Array.isArray(a) ? a : []).filter(x => x && (x.name || x.entries)).map(x => ({ name: ftText(x.name || ''), desc: ftEntries(x.entries) }));
+function ftSpellcasting(sc) {
+  const lines = [ftEntries(sc.headerEntries)];
+  const list = a => (a || []).map(s => ftText(typeof s === 'string' ? s : s.entry || '')).join(', ');
+  if (sc.will) lines.push('At will: ' + list(sc.will));
+  if (sc.daily) Object.entries(sc.daily).forEach(([k, a]) => lines.push(`${k.replace('e', '')}/day${/e$/.test(k) ? ' each' : ''}: ${list(a)}`));
+  if (sc.spells) Object.entries(sc.spells).forEach(([lvl, v]) => {
+    const n = +lvl, ord = n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+    lines.push(n === 0 ? `Cantrips (at will): ${list(v.spells)}` : `${ord} level (${v.slots != null ? v.slots + ' slot' + (v.slots === 1 ? '' : 's') : 'at will'}): ${list(v.spells)}`);
+  });
+  lines.push(ftEntries(sc.footerEntries));
+  return { name: ftText(sc.name || 'Spellcasting'), desc: lines.filter(Boolean).join('\n'), as: sc.displayAs || 'trait' };
+}
+function ftDamage(a, key) {
+  return (a || []).map(x => typeof x === 'string' ? x
+    : x.special ? ftText(x.special)
+    : `${(x.preNote ? ftText(x.preNote) + ' ' : '')}${ftDamage(x[key], key)}${x.note ? ' ' + ftText(x.note) : ''}`).join(', ');
+}
+function ftAlign(a) {
+  if (!Array.isArray(a) || !a.length) return 'Unaligned';
+  if (a.some(x => typeof x === 'object')) return a.map(x => x.special ? x.special : ftAlign(x.alignment) + (x.chance ? ` (${x.chance}%)` : '')).join(' or ');
+  const s = a.join(',');
+  if (s === 'L,NX,C,G' || s === 'L,NX,C,NY,G') return 'Any non-evil alignment';
+  if (s === 'L,NX,C,E' || s === 'L,NX,C,NY,E') return 'Any evil alignment';
+  if (s === 'NX,C,G,NY,E' || s === 'C,G,NY,E') return 'Any chaotic alignment';
+  if (s === 'L,G,NY,E') return 'Any lawful alignment';
+  if (s === 'N') return 'Neutral';
+  return capFirst(a.map(x => FT_ALIGN[x] || x).join(' '));
+}
+function fromFiveTools(m) {
+  const t = m.type || '', typeName = typeof t === 'string' ? t : (typeof t.type === 'string' ? t.type : ((t.type && t.type.choose) || []).join(' or '));
+  const tags = typeof t === 'object' && Array.isArray(t.tags) ? t.tags.map(x => typeof x === 'string' ? x : [x.prefix, x.tag].filter(Boolean).join(' ')) : [];
+  const ac0 = Array.isArray(m.ac) ? m.ac[0] : m.ac;
+  const acNote = ac0 && typeof ac0 === 'object' ? [(ac0.from || []).map(ftText).join(', '), ac0.condition ? ftText(ac0.condition) : ''].filter(Boolean).join(' ') : '';
+  const sp = m.speed || {}, spd = v => typeof v === 'object' ? `${v.number} ft.${v.condition ? ' ' + ftText(v.condition) : ''}` : `${v} ft.`;
+  const speed = ['walk', 'burrow', 'climb', 'fly', 'swim'].filter(k => sp[k] != null && sp[k] !== true)
+    .map(k => (k === 'walk' ? '' : k + ' ') + spd(sp[k]) + (k === 'fly' && sp.canHover ? ' (hover)' : '')).join(', ');
+  const sign = v => String(v).trim();
+  const out = {
+    name: m.name, size: FT_SIZE[(m.size || [])[0]] || 'Medium',
+    type: capFirst(typeName), subtype: [m.type && m.type.swarmSize ? `swarm of ${FT_SIZE[m.type.swarmSize] || ''} creatures` : '', ...tags].filter(Boolean).join(', '),
+    alignment: (m.alignmentPrefix ? ftText(m.alignmentPrefix) : '') + ftAlign(m.alignment),
+    ac: typeof ac0 === 'object' ? ac0.ac : ac0, acNote,
+    hp: m.hp && m.hp.average, hpFormula: m.hp && m.hp.formula ? m.hp.formula : '',
+    speed: speed || '0 ft.',
+    str: m.str, dex: m.dex, con: m.con, int: m.int, wis: m.wis, cha: m.cha,
+    saves: Object.entries(m.save || {}).filter(([, v]) => typeof v === 'string').map(([k, v]) => `${capFirst(k)} ${sign(v)}`).join(', '),
+    skills: Object.entries(m.skill || {}).filter(([, v]) => typeof v === 'string').map(([k, v]) => `${k.replace(/\b\w/g, c => c.toUpperCase())} ${sign(v)}`).join(', '),
+    vuln: ftDamage(m.vulnerable, 'vulnerable'), resist: ftDamage(m.resist, 'resist'), immune: ftDamage(m.immune, 'immune'),
+    condImmune: ftDamage(m.conditionImmune, 'conditionImmune'),
+    senses: [...(m.senses || []).map(ftText), m.passive != null ? `passive Perception ${m.passive}` : ''].filter(Boolean).join(', '),
+    languages: (m.languages || []).map(ftText).join(', ') || '—',
+    cr: typeof m.cr === 'object' && m.cr ? m.cr.cr : m.cr,
+    traits: ftSection(m.trait), actions: ftSection(m.action), bonus: ftSection(m.bonus),
+    reactions: ftSection(m.reaction), legendary: ftSection(m.legendary),
+    legendaryIntro: m.legendary ? (m.legendaryHeader ? ftEntries(m.legendaryHeader)
+      : `The ${m.isNamedCreature ? m.name : m.name.toLowerCase()} can take ${m.legendaryActions || 3} legendary actions, choosing from the options below. Only one legendary action option can be used at a time and only at the end of another creature's turn. The ${m.isNamedCreature ? m.name : m.name.toLowerCase()} regains spent legendary actions at the start of its turn.`) : '',
+    notes: m.source ? `Source: ${m.source}${m.page ? ` p. ${m.page}` : ''}` : ''
+  };
+  (m.spellcasting || []).forEach(sc => { const s = ftSpellcasting(sc); (s.as === 'action' ? out.actions : s.as === 'bonus' ? out.bonus : out.traits).push({ name: s.name, desc: s.desc }); });
+  // Keep only sections the app knows.
+  SECTIONS.forEach(([k]) => { if (!out[k]) out[k] = []; });
+  return out;
+}
+function importFiveTools(data) {
+  const title = str((data.meta && data.meta.book) || (data._meta && data._meta.sources && data._meta.sources[0] && data._meta.sources[0].full)) || '5etools import';
+  // File into a book the DM already has whose name matches the title ("Volo" for "Volo's Guide to Monsters"), or a new one.
+  const words = s => s.toLowerCase().replace(/['’]s\b/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 2);
+  const tw = words(title);
+  const match = state.books.find(b => b.name.toLowerCase() === title.toLowerCase()) || state.books.find(b => { const bw = words(b.name); return bw.length && bw.every(w => tw.includes(w)); });
+  const bookName = match ? match.name : title.slice(0, 40);
+  const bookId = match && match.id;
+  const all = data.monster.filter(m => m && m.name && !m._copy);
+  const have = new Set(state.monsters.filter(x => bookId && inBook(x, bookId)).map(x => x.name.toLowerCase()));
+  const list = all.filter(m => !have.has(m.name.toLowerCase())).map(m => ({ ...fromFiveTools(m), books: [bookName] }));
+  if (!list.length) { siteMsg('#siteImportMsg', `All ${all.length} monsters from this file are already in “${bookName}”.`); return; }
+  const skipped = all.length - list.length;
+  showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from ${title} to the book “${bookName}”${match ? '' : ' (a new book)'}?`
+    + (skipped ? ` ${skipped} already in that book are skipped.` : '') + ' Nothing is replaced.', 'Add', () => addMonsterList(list));
+}
+
 /* A monster in an import file can name its books ("books": ["WOW"]): it's filed in the book with that name,
    which is created if this bestiary doesn't have it yet. */
 async function bookIdsByName(names) {
