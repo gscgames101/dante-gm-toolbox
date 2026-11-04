@@ -85,9 +85,15 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .pane { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .app[data-view="list"] #detailPane { display: none; }
 .app[data-view="detail"] #listPane { display: none; }
+/* Monster and map lists: books + search stay put on top; only the list below scrolls (with its own scrollbar). */
+#listPane, .map-list-pane { display: flex; flex-direction: column; overflow: hidden; }
+#listPane > .list-tools, .map-list-pane > .list-tools { flex: none; position: static; }
+.list-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-right, 0px))); padding-inline: max(16px, env(safe-area-inset-right, 0px)); }
 @media (min-width: 820px) {
   .panes { grid-template-columns: minmax(300px, 360px) 1fr; }
-  .app[data-view] #listPane, .app[data-view] #detailPane { display: block; }
+  .app[data-view] #detailPane { display: block; }
+  .app[data-view] #listPane { display: flex; }
   #listPane { border-right: 1px solid var(--line); }
   .back { display: none !important; }
 }
@@ -566,7 +572,7 @@ button.cb-pic { cursor: zoom-in; }
 .mapsview[data-mview="map"] .map-list-pane { display: none; }
 @media (min-width: 820px) {
   .mapsview { grid-template-columns: minmax(280px, 340px) 1fr; }
-  .mapsview[data-mview] .map-list-pane { display: block; border-right: 1px solid var(--line); }
+  .mapsview[data-mview] .map-list-pane { display: flex; border-right: 1px solid var(--line); }
   .mapsview[data-mview] .map-pane { display: flex; }
   .map-back { display: none !important; }
 }
@@ -697,6 +703,7 @@ button.cb-pic { cursor: zoom-in; }
         </div>
         <div class="chips" id="chips" role="group" aria-label="Filter by type"></div>
       </div>
+      <div class="list-scroll" id="listScroll">
       <ul class="mlist" id="list"></ul>
       <div class="empty" id="empty" hidden></div>
       <div class="list-foot">
@@ -705,6 +712,7 @@ button.cb-pic { cursor: zoom-in; }
           <button class="btn small ghost" data-act="pdf-open" id="pdfBtn" hidden>Import PDF</button>
           <button class="btn small ghost" data-act="backup">Backup &amp; import</button>
         </span>
+      </div>
       </div>
     </section>
 
@@ -753,8 +761,10 @@ button.cb-pic { cursor: zoom-in; }
         </div>
         <p class="hint" id="mapUploadMsg" style="margin:0" hidden></p>
       </div>
+      <div class="list-scroll" id="mapListScroll">
       <div class="map-grid" id="mapGrid"></div>
       <div class="empty" id="mapEmpty" hidden></div>
+      </div>
     </section>
     <section class="map-pane" id="mapPane" aria-label="Map">
       <div class="map-placeholder" id="mapPlaceholder"><p>Pick a map from the list, or add one with <b>+ New map</b>.</p></div>
@@ -3447,7 +3457,7 @@ function stashScreen() {
   ss.set('pb-screen', {
     at: Date.now(), tab: $('#app').dataset.tab, view: $('#app').dataset.view, selectedId: state.selectedId,
     sheetId: $('#sbSheet').hidden ? null : state.sheetId, encSel: state.encSel,
-    scroll: { initMain: $('#initMain').scrollTop, initSide: $('#initSide').scrollTop, sheet: $('#sbSheet').scrollTop, list: $('#listPane').scrollTop, detail: $('#detailPane').scrollTop },
+    scroll: { initMain: $('#initMain').scrollTop, initSide: $('#initSide').scrollTop, sheet: $('#sbSheet').scrollTop, list: $('#listScroll').scrollTop, detail: $('#detailPane').scrollTop },
     trayOpen: !$('#trayMore').hidden, mode: state.mode, log: state.log.slice(0, 15)
   });
 }
@@ -3466,7 +3476,7 @@ function restoreScreen() {
   const sc = s.scroll || {};
   requestAnimationFrame(() => {
     $('#initMain').scrollTop = sc.initMain || 0; $('#initSide').scrollTop = sc.initSide || 0; $('#sbSheet').scrollTop = sc.sheet || 0;
-    $('#listPane').scrollTop = sc.list || 0; $('#detailPane').scrollTop = sc.detail || 0;
+    $('#listScroll').scrollTop = sc.list || 0; $('#detailPane').scrollTop = sc.detail || 0;
   });
 }
 async function publishPlayers() {
@@ -4116,11 +4126,11 @@ document.addEventListener('click', async ev => {
   if (t.dataset.die) return doRoll(t.dataset.die, t.dataset.die);
   if (t.dataset.zoom) { $('#lightImg').src = imgSrc(t.dataset.zoom); $('#lightbox').hidden = false; return; }
   // books
-  if (t.dataset.book) { state.book = t.dataset.book; ls.set('pb-book', state.book); renderList(); $('#listPane').scrollTop = 0; return; }
+  if (t.dataset.book) { state.book = t.dataset.book; ls.set('pb-book', state.book); renderList(); $('#listScroll').scrollTop = 0; return; }
   if (t.dataset.bk) { t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true')); return; }
   if (t.dataset.ppaste) { pastePlayerPic(t.dataset.ppaste, t); return; }
   // maps
-  if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListPane').scrollTop = 0; return; }
+  if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
   if (t.dataset.mtool) { state.mapTool = t.dataset.mtool; renderMapWork(); return; }
   if (t.dataset.msize) { state.mapSize = t.dataset.msize; renderMapWork(); return; }
