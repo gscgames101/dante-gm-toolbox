@@ -252,12 +252,12 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 :root { --cover-ink: #f4ecd8; --cover-rule: #f4ecd873; --page-a: #efe6cf; --page-b: #d6cbb1; --spine: #00000047; --spine-hi: #ffffff14; }
 .shelf { display: flex; gap: 14px; overflow-x: auto; padding: 16px 6px 12px 2px; margin: 0 -2px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
 .book { flex: none; position: relative; width: 5.75rem; height: 8rem; border: 0; border-radius: 3px 8px 8px 3px;
-  background: var(--book, #3d4a52); color: var(--cover-ink); padding: 10px 9px 8px 17px;
+  background: var(--cover, var(--book, #3d4a52)); color: var(--cover-ink); padding: 10px 9px 8px 17px;
   display: flex; flex-direction: column; justify-content: space-between; text-align: left;
   box-shadow: inset 7px 0 0 var(--spine), inset 9px 0 0 var(--spine-hi), 3px 4px 10px #0000002e; transition: transform .15s ease; }
 .book::after { content: ""; position: absolute; top: 6px; bottom: 6px; right: -4px; width: 4px; border-radius: 0 2px 2px 0;
   background: repeating-linear-gradient(to bottom, var(--page-a) 0 2px, var(--page-b) 2px 3px); }
-.book-title { font-family: var(--display); font-size: 1rem; line-height: 1.12; overflow-wrap: normal; word-break: normal; hyphens: manual; padding: 5px 0;
+.book-title { font-family: var(--display); font-size: 1rem; line-height: 1.12; text-shadow: 0 1px 2px #00000080; overflow-wrap: normal; word-break: normal; hyphens: manual; padding: 5px 0;
   border-top: 1px solid var(--cover-rule); border-bottom: 1px solid var(--cover-rule);
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .book-count { font-family: var(--mono); font-size: .74rem; opacity: .8; }
@@ -285,6 +285,7 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatches button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
 .swatches button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.swatches .sw-sep { flex-basis: 100%; margin-top: 4px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .book-tag { display: inline-flex; align-items: center; gap: 6px; }
 .book-tag::before { content: ""; width: 8px; height: 11px; border-radius: 1px 2px 2px 1px; background: var(--book); }
 .mlist li.has-tobook { display: flex; align-items: center; gap: 4px; }
@@ -1698,18 +1699,50 @@ function linkifyBonuses(t) {
 
 /* ---------- list ---------- */
 /* ---------- books ---------- */
-const BOOK_COLORS = { oxblood: '#7a1f24', forest: '#2f5233', navy: '#24395c', teal: '#1f5552', plum: '#4f2a4f', umber: '#6b4a2b', ochre: '#8a5f14', slate: '#3d4a52' };
+/* Cover colours. The first 8 are the originals (new books cycle through them). Every colour is dark enough for the cream title. */
+const BOOK_COLORS = {
+  oxblood: '#7a1f24', forest: '#2f5233', navy: '#24395c', teal: '#1f5552', plum: '#4f2a4f', umber: '#6b4a2b', ochre: '#8a5f14', slate: '#3d4a52',
+  crimson: '#9b2226', rust: '#8f3b1b', wine: '#5e1f3a', rose: '#8a3a5a', violet: '#5b2d7a', indigo: '#33306b', petrol: '#1b4f6b', emerald: '#1d5e45',
+  olive: '#4f5a1e', moss: '#3e4a2c', chocolate: '#4a2c1f', bronze: '#7a5a2a', charcoal: '#2b2b2b', ash: '#555a5e',
+  // Two-tone (leather-bound look): main colour, with the spine band and corners in a second colour (BOOK_BANDS).
+  'oxblood-gold': '#7a1f24', 'navy-gold': '#24395c', 'forest-gold': '#2f5233', 'charcoal-gold': '#2b2b2b', 'plum-silver': '#4f2a4f',
+  'teal-copper': '#1f5552', 'charcoal-oxblood': '#2b2b2b', 'navy-crimson': '#24395c', 'umber-forest': '#6b4a2b', 'slate-rust': '#3d4a52',
+  'wine-ash': '#5e1f3a', 'indigo-bronze': '#33306b'
+};
+const BOOK_BANDS = {
+  'oxblood-gold': '#b8902e', 'navy-gold': '#b8902e', 'forest-gold': '#b8902e', 'charcoal-gold': '#b8902e', 'plum-silver': '#8e979c',
+  'teal-copper': '#a8642e', 'charcoal-oxblood': '#7a1f24', 'navy-crimson': '#9b2226', 'umber-forest': '#2f5233', 'slate-rust': '#8f3b1b',
+  'wine-ash': '#6e7479', 'indigo-bronze': '#7a5a2a'
+};
 state.books = []; state.book = 'all'; state.bookEditing = null; state.bookColor = 'oxblood';
-const bookColor = b => BOOK_COLORS[b && b.color] || BOOK_COLORS.oxblood;
+const colorKey = k => BOOK_COLORS[k] ? k : 'oxblood';
+const bookColor = b => BOOK_COLORS[colorKey(b && b.color)];
+// The cover itself: plain colour, or for two-tone a spine band plus corner pieces in the second colour.
+function coverBg(k) {
+  k = colorKey(k); const main = BOOK_COLORS[k], band = BOOK_BANDS[k];
+  if (!band) return main;
+  return `linear-gradient(225deg, ${band} 0 13%, transparent 13%), linear-gradient(315deg, ${band} 0 13%, transparent 13%), `
+    + `linear-gradient(90deg, ${band} 0 13px, #00000059 13px 14.5px, ${main} 14.5px)`;
+}
+const coverStyle = k => `--book:${BOOK_COLORS[colorKey(k)]};--cover:${coverBg(k)}`;
+// Colour picker: solid colours, then two-tone ones.
+function colorSwatches(sel, attr) {
+  const sw = k => {
+    const band = BOOK_BANDS[k], bg = band ? `linear-gradient(135deg, ${band} 0 42%, ${BOOK_COLORS[k]} 42%)` : BOOK_COLORS[k];
+    return `<button type="button" role="radio" ${attr}="${k}" aria-checked="${sel === k}" aria-label="${k.replace('-', ' and ')}" title="${k.replace('-', ' and ')}" style="--sw:${bg}"></button>`;
+  };
+  const keys = Object.keys(BOOK_COLORS);
+  return keys.filter(k => !BOOK_BANDS[k]).map(sw).join('') + '<span class="sw-sep">Two-tone</span>' + keys.filter(k => BOOK_BANDS[k]).map(sw).join('');
+}
 const inBook = (m, id) => (m.bookIds || []).includes(id);
 function sortedBooks() { return [...state.books].sort((a, b) => a.name.localeCompare(b.name)); }
 function renderShelf() {
   if (state.book !== 'all' && !state.books.some(b => b.id === state.book)) state.book = 'all';
   const tile = (id, name, count, style, cls) =>
-    `<button class="book${cls ? ' ' + cls : ''}" data-book="${esc(id)}" aria-pressed="${state.book === id}"${style ? ` style="--book:${style}"` : ''} aria-label="${esc(name)}, ${count} monster${count === 1 ? '' : 's'}">
+    `<button class="book${cls ? ' ' + cls : ''}" data-book="${esc(id)}" aria-pressed="${state.book === id}"${style ? ` style="${style}"` : ''} aria-label="${esc(name)}, ${count} monster${count === 1 ? '' : 's'}">
       <span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
   $('#shelf').innerHTML = tile('all', 'All monsters', state.monsters.length, '', 'book-all')
-    + sortedBooks().map(b => tile(b.id, b.name, state.monsters.filter(m => inBook(m, b.id)).length, bookColor(b))).join('')
+    + sortedBooks().map(b => tile(b.id, b.name, state.monsters.filter(m => inBook(m, b.id)).length, coverStyle(b.color))).join('')
     + (state.canWrite ? `<button class="book book-new" data-act="book-new">+ New book</button>` : '');
   const bar = $('#bookBar'), cur = state.books.find(b => b.id === state.book);
   bar.hidden = !cur;
@@ -1717,13 +1750,13 @@ function renderShelf() {
     ${state.canWrite ? `<button class="btn small ghost" data-act="book-edit">Edit book</button>` : ''}` : '';
 }
 function renderBookColors() {
-  $('#bookColors').innerHTML = Object.entries(BOOK_COLORS).map(([k, v]) =>
-    `<button type="button" role="radio" data-bcolor="${k}" aria-checked="${state.bookColor === k}" aria-label="${k}" style="--sw:${v}"></button>`).join('');
+  $('#bookColors').innerHTML = colorSwatches(state.bookColor, 'data-bcolor');
   updateBookPreview();
 }
 function updateBookPreview() {
   const p = $('#bookPreview');
-  p.style.setProperty('--book', BOOK_COLORS[state.bookColor]);
+  p.style.setProperty('--book', BOOK_COLORS[colorKey(state.bookColor)]);
+  p.style.setProperty('--cover', coverBg(state.bookColor));
   p.querySelector('.book-title').textContent = str($('#bookName').value) || 'Untitled';
   const n = state.bookEditing ? state.monsters.filter(m => inBook(m, state.bookEditing)).length : 0;
   p.querySelector('.book-count').textContent = n;
@@ -3346,11 +3379,11 @@ function renderPickList() {
   // Books on top filter the list, like the Bestiary's shelf (smaller tiles).
   if (state.pickBook !== 'all' && !state.books.some(b => b.id === state.pickBook)) state.pickBook = 'all';
   const tile = (id, name, count, style, cls) =>
-    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-pickbook="${esc(id)}" aria-pressed="${state.pickBook === id}"${style ? ` style="--book:${style}"` : ''} aria-label="${esc(name)}, ${count} monster${count === 1 ? '' : 's'}">
+    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-pickbook="${esc(id)}" aria-pressed="${state.pickBook === id}"${style ? ` style="${style}"` : ''} aria-label="${esc(name)}, ${count} monster${count === 1 ? '' : 's'}">
       <span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
   $('#pickShelf').hidden = !state.books.length;
   $('#pickShelf').innerHTML = state.books.length ? tile('all', 'All', state.monsters.length, '', 'book-all')
-    + sortedBooks().map(b => tile(b.id, b.name, state.monsters.filter(m => inBook(m, b.id)).length, bookColor(b))).join('') : '';
+    + sortedBooks().map(b => tile(b.id, b.name, state.monsters.filter(m => inBook(m, b.id)).length, coverStyle(b.color))).join('') : '';
   const q = str($('#pickQ').value).toLowerCase();
   const inShelf = state.pickBook === 'all' ? state.monsters : state.monsters.filter(m => inBook(m, state.pickBook));
   const arr = inShelf.filter(m => !q || [m.name, m.type, (m.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
@@ -3997,10 +4030,10 @@ const cleanMarks = a => (Array.isArray(a) ? a : []).filter(k => k && k.id && ['p
 function renderMaps() {
   if (state.mapFolder !== 'all' && !state.mapFolders.some(f => f.id === state.mapFolder)) state.mapFolder = 'all';
   const tile = (id, name, count, style, cls) =>
-    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-mfolder="${esc(id)}" aria-pressed="${state.mapFolder === id}"${style ? ` style="--book:${style}"` : ''} aria-label="${esc(name)}, ${count} map${count === 1 ? '' : 's'}">
+    `<button type="button" class="book${cls ? ' ' + cls : ''}" data-mfolder="${esc(id)}" aria-pressed="${state.mapFolder === id}"${style ? ` style="${style}"` : ''} aria-label="${esc(name)}, ${count} map${count === 1 ? '' : 's'}">
       <span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
   $('#mapShelf').innerHTML = tile('all', 'All maps', state.maps.length, '', 'book-all')
-    + sortedFolders().map(f => tile(f.id, f.name, state.maps.filter(m => m.folderId === f.id).length, BOOK_COLORS[f.color] || BOOK_COLORS.oxblood)).join('')
+    + sortedFolders().map(f => tile(f.id, f.name, state.maps.filter(m => m.folderId === f.id).length, coverStyle(f.color))).join('')
     + (state.canWrite ? `<button type="button" class="book book-new" data-act="folder-new">+ New folder</button>` : '');
   const cur = state.mapFolders.find(f => f.id === state.mapFolder), bar = $('#mapFolderBar');
   bar.hidden = !cur;
@@ -4042,8 +4075,7 @@ function openFolderDlg(folder) {
   $('#folderSheet').hidden = false; $('#folderName').focus();
 }
 function renderFolderColors() {
-  $('#folderColors').innerHTML = Object.entries(BOOK_COLORS).map(([k, v]) =>
-    `<button type="button" role="radio" data-fcolor="${k}" aria-checked="${state.folderColor === k}" aria-label="${k}" style="--sw:${v}"></button>`).join('');
+  $('#folderColors').innerHTML = colorSwatches(state.folderColor, 'data-fcolor');
 }
 async function saveFolder(e) {
   e.preventDefault();
