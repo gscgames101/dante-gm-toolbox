@@ -3095,6 +3095,9 @@ function ftText(s) {
         case 'dc': return 'DC ' + body;
         case 'recharge': return body ? `(Recharge ${body}${body === '6' ? '' : '–6'})` : '(Recharge 6)';
         case 'chance': return body.split('|')[0] + '%';
+        // {@quickref Cover||3||total cover}: shown text is the 5th part; {@book …}, {@filter …}: the first part.
+        case 'quickref': { const p = body.split('|'); return p[4] || p[0]; }
+        case 'book': case 'adventure': case 'filter': return body.split('|')[0];
         default: { const p = body.split('|'); return p[2] || p[0]; }
       }
     });
@@ -3186,12 +3189,30 @@ function importFiveTools(data) {
   const bookName = match ? match.name : title.slice(0, 40);
   const bookId = match && match.id;
   const all = data.monster.filter(m => m && m.name && !m._copy);
-  const have = new Set(state.monsters.filter(x => bookId && inBook(x, bookId)).map(x => x.name.toLowerCase()));
-  const list = all.filter(m => !have.has(m.name.toLowerCase())).map(m => ({ ...fromFiveTools(m), books: [bookName] }));
-  if (!list.length) { siteMsg('#siteImportMsg', `All ${all.length} monsters from this file are already in “${bookName}”.`); return; }
-  const skipped = all.length - list.length;
-  showConfirm(`Add ${list.length} monster${list.length === 1 ? '' : 's'} from ${title} to the book “${bookName}”${match ? '' : ' (a new book)'}?`
-    + (skipped ? ` ${skipped} already in that book are skipped.` : '') + ' Nothing is replaced.', 'Add', () => addMonsterList(list));
+  const inThisBook = new Map(state.monsters.filter(x => bookId && inBook(x, bookId)).map(x => [x.name.toLowerCase(), x]));
+  const list = all.filter(m => !inThisBook.has(m.name.toLowerCase())).map(m => ({ ...fromFiveTools(m), books: [bookName] }));
+  // Already in the book from an earlier import and never edited since (saved within a minute of being added):
+  // refreshed from the file, so fixes to the converter reach them. Their picture, tags and books stay.
+  const unedited = x => Math.abs((x.updatedAt || 0) - (x.createdAt || 0)) < 60000;
+  const refresh = all.map(m => [m, inThisBook.get(m.name.toLowerCase())]).filter(([, x]) => x && unedited(x));
+  const kept = all.length - list.length - refresh.length;
+  if (!list.length && !refresh.length) { siteMsg('#siteImportMsg', `All ${all.length} monsters from this file are already in “${bookName}”, and you’ve edited them, so they’re left alone.`); return; }
+  showConfirm((list.length ? `Add ${list.length} monster${list.length === 1 ? '' : 's'} from ${title} to the book “${bookName}”${match ? '' : ' (a new book)'}?` : `Refresh monsters from ${title} in “${bookName}”?`)
+    + (refresh.length ? ` ${refresh.length} already there that you haven’t edited are refreshed from the file (pictures and tags stay).` : '')
+    + (kept ? ` ${kept} you’ve edited ${kept === 1 ? 'is' : 'are'} left alone.` : ''), list.length ? 'Add' : 'Refresh', async () => {
+    if (list.length) await addMonsterList(list);
+    let ok = 0;
+    try {
+      for (const [m, x] of refresh) {
+        const next = { ...fromFiveTools(m), image: x.image, thumb: x.thumb, tags: x.tags, bookIds: x.bookIds, createdAt: x.createdAt,
+          lair: x.lair, lairIntro: x.lairIntro, notes: /regional effects/i.test(x.notes || '') ? x.notes : fromFiveTools(m).notes };
+        const data = normalize(next); data.updatedAt = data.createdAt;  // still counts as "not edited"
+        await state.db.collection('monsters').doc(x.id).set(data);
+        siteMsg('#siteImportMsg', `Refreshing… ${++ok} of ${refresh.length}`);
+      }
+      if (refresh.length) siteMsg('#siteImportMsg', `${list.length ? `Added ${list.length}. ` : ''}Refreshed ${ok} monster${ok === 1 ? '' : 's'}.`);
+    } catch (e) { siteMsg('#siteImportMsg', `Refreshed ${ok} of ${refresh.length}. ${saveErrorText(e)}`, true); }
+  });
 }
 
 /* 5etools legendary groups: lairActions = intro text, then a list of actions (some named, most not). */
@@ -3206,6 +3227,8 @@ function ftLair(g) {
     else { const t = ftEntries(e); if (t) items.length ? add('', t) : intro.push(t); }
   });
   walk(g.lairActions);
+  // Only a paragraph, no list (the ki-rin): that paragraph is the lair action.
+  if (!items.length && intro.length) return { lairIntro: '', lair: intro.filter(Boolean).map(desc => ({ name: '', desc })) };
   return { lairIntro: intro.filter(Boolean).join('\n'), lair: items };
 }
 function importLairs(groups) {
@@ -3235,7 +3258,9 @@ function importLairs(groups) {
         const m = t.m, next = { ...m };
         if (t.lair) { next.lair = t.lair; next.lairIntro = t.lairIntro; }
         if (t.regional) next.notes = [m.notes, 'Regional effects\n' + t.regional].filter(Boolean).join('\n\n');
-        await state.db.collection('monsters').doc(m.id).set(normalize(next));
+        const data = normalize(next);
+        if (Math.abs((m.updatedAt || 0) - (m.createdAt || 0)) < 60000) data.updatedAt = data.createdAt;  // an import, not an edit
+        await state.db.collection('monsters').doc(m.id).set(data);
         siteMsg('#siteImportMsg', `Adding lair actions… ${++ok} of ${todo.length}`);
       }
       siteMsg('#siteImportMsg', `Added lair actions to ${ok} monster${ok === 1 ? '' : 's'}.`);
