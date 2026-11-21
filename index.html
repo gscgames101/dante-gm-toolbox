@@ -598,7 +598,13 @@ button.cb-pic { cursor: zoom-in; }
 .map-title { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 36px; padding: 0 6px; margin-left: -6px; border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; color: inherit; cursor: pointer; }
 .map-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .map-title svg { flex: none; color: var(--muted); }
-.map-title:hover { border-color: var(--line); }.map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
+.map-title:hover { border-color: var(--line); }
+/* Fog row: its own line under the drawing tools */
+.fog-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fog-tools { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fog-tools[hidden] { display: none; }
+#fogToggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
 .map-colors { display: flex; gap: 5px; flex-wrap: wrap; }
 .map-colors button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
 .map-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--accent); }
@@ -801,6 +807,19 @@ button.cb-pic { cursor: zoom-in; }
           </div>
           <button type="button" class="btn small ghost" data-act="map-undo" id="mapUndo" disabled>↶ Undo</button>
           <button type="button" class="btn small ghost" data-act="map-fit">Fit</button>
+          <div class="fog-row" id="fogRow">
+            <button type="button" class="btn small" data-act="fog-toggle" id="fogToggle" aria-pressed="false" title="Hide the map from players and reveal it room by room">Fog: off</button>
+            <span class="fog-tools" id="fogTools" hidden>
+              <span class="seg" role="group" aria-label="Fog tool">
+                <button type="button" data-mtool="reveal-rect" aria-pressed="false" title="Drag a box to reveal a room">Reveal ▭</button>
+                <button type="button" data-mtool="reveal-brush" aria-pressed="false" title="Paint to reveal (size: S/M/L)">Reveal ✎</button>
+                <button type="button" data-mtool="hide-rect" aria-pressed="false" title="Drag a box to cover an area again">Hide ▭</button>
+                <button type="button" data-mtool="hide-brush" aria-pressed="false" title="Paint to cover again (size: S/M/L)">Hide ✎</button>
+              </span>
+              <button type="button" class="btn small ghost" data-act="fog-reveal-all">Reveal all</button>
+              <button type="button" class="btn small ghost" data-act="fog-hide-all">Hide all</button>
+            </span>
+          </div>
         </div>
         <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
       </div>
@@ -3333,7 +3352,7 @@ async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], m
       ...mapFolders.map(({ id, ...f }) => () => db.collection('mapFolders').doc(id).set({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() })),
       ...maps.filter(m => fix(m.image)).map(({ id, ...m }) => () => db.collection('maps').doc(id).set({
         name: str(m.name) || 'Map', folderId: m.folderId || null, image: fix(m.image), thumb: fix(m.thumb) || '',
-        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), createdAt: m.createdAt || Date.now() }))
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), createdAt: m.createdAt || Date.now() }))
     ];
     let done = 0; const total = jobs.length;
     const worker = async () => { for (let j; (j = jobs.shift());) { await j(); siteMsg('#siteImportMsg', `Saving… ${++done} of ${total}`); } };
@@ -3370,7 +3389,7 @@ function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps 
       mirror('monsters', monsters, state.monsters, ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
       mirror('mapFolders', mapFolders, state.mapFolders, ({ id, ...f }) => ({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() }));
       mirror('maps', maps, state.maps, ({ id, ...m }) => ({ name: str(m.name) || 'Map', folderId: m.folderId || null, image: m.image, thumb: m.thumb || '',
-        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), createdAt: m.createdAt || Date.now() }));
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), createdAt: m.createdAt || Date.now() }));
       for (let i = 0; i < ops.length; i += 100) {  // map documents can be large, so smaller batches
         const b = db.batch(); ops.slice(i, i + 100).forEach(f => f(b)); await b.commit();
       }
@@ -4222,6 +4241,16 @@ document.addEventListener('click', async ev => {
     case 'map-send': sendMapToPlayers(); break;
     case 'map-stop': stopShowingMap(); break;
     case 'map-undo': undoMarks(); break;
+    case 'fog-toggle': {
+      // On: everything hidden at first (or as it was when fog was last on). Off: players see the whole map.
+      const m = curMap(); if (!m) break;
+      const turningOn = !(m.fog && m.fog.on);
+      changeFog(f => ({ on: turningOn, ops: f.ops }));
+      if (turningOn) { state.mapTool = 'reveal-rect'; renderMapWork(); toast('Fog is on: players see nothing. Drag boxes to reveal rooms.'); }
+      break;
+    }
+    case 'fog-reveal-all': changeFog(f => ({ on: true, ops: [{ r: 1, k: 'rect', x: 0, y: 0, w: (curMap() || {}).w || 1000, h: (curMap() || {}).h || 1000 }] })); break;
+    case 'fog-hide-all': changeFog(() => ({ on: true, ops: [] })); break;
     case 'map-fit': if (dmViewer) dmViewer.fit(); break;
     case 'mark-cancel': $('#markSheet').hidden = true; state.markEditing = null; break;
     case 'mark-delete': {
@@ -4509,6 +4538,40 @@ const curMap = () => state.maps.find(m => m.id === state.mapId) || null;
 const folderOf = m => state.mapFolders.find(f => f.id === m.folderId) || null;
 const sortedFolders = () => [...state.mapFolders].sort((a, b) => a.name.localeCompare(b.name));
 const cleanMarks = a => (Array.isArray(a) ? a : []).filter(k => k && k.id && ['pin', 'pen', 'paint', 'text'].includes(k.k));
+/* Fog of war. A map's fog starts as fully hidden; each step either reveals (r: 1) or hides again (r: 0) a box
+   ({k: 'rect', x, y, w, h}) or a brush stroke ({k: 'line', s: width, p: [x, y, x, y, …]}), applied in order. */
+const cleanFog = f => f && typeof f === 'object'
+  ? { on: !!f.on, ops: (Array.isArray(f.ops) ? f.ops : []).filter(o => o && (o.k === 'rect' ? [o.x, o.y, o.w, o.h].every(Number.isFinite) : o.k === 'line' && Array.isArray(o.p) && o.p.length >= 2)) }
+  : null;
+function fogSvg(m, dm, id) {
+  const f = m.fog; if (!f || !f.on) return '';
+  const W = m.w || 1000, H = m.h || 1000;
+  const pts = p => { let s = ''; for (let i = 0; i + 1 < p.length; i += 2) s += (i ? ' ' : '') + p[i] + ',' + p[i + 1]; return s; };
+  const shapes = f.ops.map(o => {
+    const c = o.r ? '#000' : '#fff';  // in the mask: black = clear (revealed), white = fog
+    return o.k === 'rect' ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${c}"/>`
+      : `<polyline points="${pts(o.p)}" stroke="${c}" stroke-width="${o.s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+  // Players: solid black. The DM: a see-through shade, so they can still read the map underneath.
+  return `<defs><mask id="fog-${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#fff"/>${shapes}</mask></defs>`
+    + `<rect width="${W}" height="${H}" fill="${dm ? '#0d1424' : '#000'}" opacity="${dm ? 0.55 : 1}" mask="url(#fog-${id})"/>`;
+}
+// Is this point (image pixels) under fog? Replays the steps, so a pin hidden by fog can't be tapped by players.
+function isFogged(m, pt) {
+  const f = m.fog; if (!f || !f.on) return false;
+  let hidden = true;
+  for (const o of f.ops) {
+    let inside = false;
+    if (o.k === 'rect') inside = pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h;
+    else for (let i = 0; i + 1 < o.p.length && !inside; i += 2) {
+      const ax = o.p[i], ay = o.p[i + 1], bx = o.p[i + 2] ?? ax, by = o.p[i + 3] ?? ay, dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+      const t = l ? Math.max(0, Math.min(1, ((pt.x - ax) * dx + (pt.y - ay) * dy) / l)) : 0;
+      inside = Math.hypot(pt.x - (ax + t * dx), pt.y - (ay + t * dy)) <= o.s / 2;
+    }
+    if (inside) hidden = !o.r;
+  }
+  return hidden;
+}
 
 /* --- folder shelf + list --- */
 function renderMaps() {
@@ -4752,9 +4815,10 @@ function hitMark(m, marks, pt, scale) {
   }
   return null;
 }
-function drawDmMarks(extra) {
+function drawDmMarks(extra, fogPreview) {
   const m = curMap(); if (!m) return;
-  $('#mapSvg').innerHTML = marksSvg(m, m.marks, true) + (extra || '');
+  // The DM sees fog as a shade under their marks (so marks stay editable); fogPreview = fog with the step being drawn.
+  $('#mapSvg').innerHTML = fogSvg(fogPreview ? { ...m, fog: fogPreview } : m, true, 'dm') + marksSvg(m, m.marks, true) + (extra || '');
 }
 
 /* --- the DM's workspace --- */
@@ -4772,6 +4836,12 @@ function renderMapWork() {
   document.querySelectorAll('[data-mvis]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mvis === state.mapVis)));
   $('#mapColors').innerHTML = MAP_COLORS.map(c => `<button type="button" role="radio" data-mcolor="${c}" aria-checked="${state.mapColor === c}" aria-label="${c}" style="--sw:${c}"></button>`).join('');
   $('#mapUndo').disabled = !state.mapUndo.length;
+  const fogOn = !!(m.fog && m.fog.on);
+  if (!fogOn && /^(reveal|hide)-/.test(state.mapTool)) state.mapTool = 'move';  // fog tools only while fog is on
+  $('#fogToggle').setAttribute('aria-pressed', String(fogOn));
+  $('#fogToggle').textContent = fogOn ? 'Fog: on' : 'Fog: off';
+  $('#fogTools').hidden = !fogOn;
+  document.querySelectorAll('[data-mtool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mtool === state.mapTool)));
   $('#mapStage').classList.toggle('drawing', state.mapTool !== 'move');
   if (!dmViewer) { dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => editMarkAt(pt); }
   loadMapInto(dmViewer, $('#mapImg'), $('#mapSvg'), m);
@@ -4785,17 +4855,27 @@ function openMap(id) {
   requestAnimationFrame(() => dmViewer && dmViewer.fit());
 }
 /* Change the current map's marks (with undo), save shortly after, and update the players if it's on their screen. */
+const mapSnap = m => JSON.stringify({ marks: m.marks, fog: m.fog || null });  // one undo step (marks + fog)
+function pushMapUndo(m) { state.mapUndo.push(mapSnap(m)); if (state.mapUndo.length > 60) state.mapUndo.shift(); }
 function changeMarks(fn) {
   const m = curMap(); if (!m || !state.canWrite) return;
-  state.mapUndo.push(JSON.stringify(m.marks)); if (state.mapUndo.length > 60) state.mapUndo.shift();
+  pushMapUndo(m);
   m.marks = fn(m.marks.slice());
   drawDmMarks(); $('#mapUndo').disabled = false;
+  saveMarksSoon(m);
+}
+/* Change the current map's fog (with undo). fn gets a copy {on, ops} and returns the new fog. */
+function changeFog(fn) {
+  const m = curMap(); if (!m || !state.canWrite) return;
+  pushMapUndo(m);
+  m.fog = fn(m.fog ? { on: m.fog.on, ops: m.fog.ops.slice() } : { on: false, ops: [] });
+  renderMapWork(); $('#mapUndo').disabled = false;
   saveMarksSoon(m);
 }
 function saveMarksSoon(m) {
   mapDirtyId = m.id; clearTimeout(mapSaveT);
   mapSaveT = setTimeout(async () => {
-    try { await state.db.collection('maps').doc(m.id).update({ marks: m.marks, updatedAt: Date.now() }); }
+    try { await state.db.collection('maps').doc(m.id).update({ marks: m.marks, fog: m.fog || null, updatedAt: Date.now() }); }
     catch { toast('Couldn’t save the map marks. They’re still here; they’ll save with the next change.'); }
     finally { if (mapDirtyId === m.id) mapDirtyId = null; }
   }, 500);
@@ -4803,18 +4883,33 @@ function saveMarksSoon(m) {
 }
 function undoMarks() {
   const m = curMap(); if (!m || !state.mapUndo.length) return;
-  m.marks = JSON.parse(state.mapUndo.pop());
-  drawDmMarks(); $('#mapUndo').disabled = !state.mapUndo.length;
+  const o = JSON.parse(state.mapUndo.pop());
+  if (Array.isArray(o)) m.marks = o; else { m.marks = o.marks; m.fog = o.fog; }
+  renderMapWork(); $('#mapUndo').disabled = !state.mapUndo.length;
   saveMarksSoon(m);
 }
 const newMarkId = () => Math.random().toString(36).slice(2, 10);
 function dmTool() {
-  let stroke = null, start = null;
+  let stroke = null, start = null, fogOp = null;
   const sizeK = () => ({ s: 1, m: 2, l: 4 })[state.mapSize];
+  const isFogTool = t => /^(reveal|hide)-(rect|brush)$/.test(t);
+  const fogPreview = (m, op) => ({ on: true, ops: [...((m.fog && m.fog.ops) || []), op] });
+  const rectOf = (a, b) => ({ x: Math.round(Math.min(a.x, b.x)), y: Math.round(Math.min(a.y, b.y)), w: Math.round(Math.abs(a.x - b.x)), h: Math.round(Math.abs(a.y - b.y)) });
   return {
     down(e) {
       const m = curMap(); if (!m || !state.canWrite || state.mapTool === 'move') return false;
       const pt = dmViewer.toImage(e); start = pt;
+      if (isFogTool(state.mapTool)) {
+        if (!m.fog || !m.fog.on) { toast('Turn fog on first.'); return false; }
+        const r = state.mapTool.startsWith('reveal') ? 1 : 0;
+        if (state.mapTool.endsWith('rect')) fogOp = { r, k: 'rect', x: Math.round(pt.x), y: Math.round(pt.y), w: 0, h: 0 };
+        else {
+          const zoom = Math.max(1, dmViewer.s / dmViewer.fitS);  // same on-screen size at any zoom, like the pen
+          fogOp = { r, k: 'line', s: Math.max(4, Math.round(40 * mapBase(m) * sizeK() / zoom)), p: [Math.round(pt.x), Math.round(pt.y)] };
+          drawDmMarks('', fogPreview(m, { ...fogOp, p: [...fogOp.p, fogOp.p[0] + 1, fogOp.p[1]] }));
+        }
+        return true;
+      }
       if (state.mapTool === 'pen' || state.mapTool === 'paint') {
         // Width looks the same on screen at any zoom: zoomed in 3×, the line is 3× thinner on the map.
         const b = mapBase(m), zoom = Math.max(1, dmViewer.s / dmViewer.fitS);
@@ -4823,6 +4918,20 @@ function dmTool() {
       return true;
     },
     move(e) {
+      if (fogOp) {
+        const m = curMap(), pt = dmViewer.toImage(e);
+        if (fogOp.k === 'rect') {
+          Object.assign(fogOp, rectOf(start, pt));
+          const dash = 6 / dmViewer.s;  // a dashed outline so a thin box is still visible while dragging
+          drawDmMarks(`<rect x="${fogOp.x}" y="${fogOp.y}" width="${fogOp.w}" height="${fogOp.h}" fill="none" stroke="#fff" stroke-width="${2 / dmViewer.s}" stroke-dasharray="${dash} ${dash}"/>`, fogPreview(m, fogOp));
+        } else {
+          const p = fogOp.p;
+          if (Math.hypot(pt.x - p[p.length - 2], pt.y - p[p.length - 1]) < Math.max(1, 3 / dmViewer.s)) return;
+          p.push(Math.round(pt.x), Math.round(pt.y));
+          drawDmMarks('', fogPreview(m, fogOp));
+        }
+        return;
+      }
       if (!stroke) return;
       const m = curMap(), pt = dmViewer.toImage(e), p = stroke.p;
       const minStep = Math.max(1, (stroke.k === 'pen' ? 1.5 : 4) * mapBase(m) / Math.max(0.2, dmViewer.s / dmViewer.fitS));
@@ -4834,6 +4943,15 @@ function dmTool() {
     up(e) {
       const m = curMap(); if (!m) return;
       const pt = dmViewer.toImage(e);
+      if (fogOp) {
+        const op = fogOp; fogOp = null;
+        if (op.k === 'rect') {
+          Object.assign(op, rectOf(start, pt));
+          if (op.w * dmViewer.s < 6 || op.h * dmViewer.s < 6) { drawDmMarks(); toast('Drag a box over the area.'); return; }
+        } else if (op.p.length === 2) op.p.push(op.p[0] + 1, op.p[1]);  // a tap makes a dot
+        changeFog(f => ({ on: true, ops: [...f.ops, op] }));
+        return;
+      }
       if (stroke) {
         if (stroke.p.length === 2) stroke.p.push(stroke.p[0] + 1, stroke.p[1]);  // a tap makes a dot
         const k = { id: newMarkId(), ...stroke }; stroke = null;
@@ -4849,7 +4967,7 @@ function dmTool() {
           s: Math.round(24 * mapBase(m) * sizeK()), t: '', n: '' }, true);
       }
     },
-    cancel() { stroke = null; drawDmMarks(); }
+    cancel() { stroke = null; fogOp = null; drawDmMarks(); }
   };
 }
 /* Tapping a pin or a text with the Move tool opens it for editing. */
@@ -4916,7 +5034,8 @@ function publicMap() {
     const pm = !SITE && state.shownMap && (readPub() || {}).map;
     return pm && pm.id === state.shownMap.id ? pm : null;
   }
-  return { id: m.id, name: m.name, image: m.image, w: m.w, h: m.h, marks: m.marks.filter(k => k.vis !== 'dm'), sentAt: state.shownMap.sentAt };
+  return { id: m.id, name: m.name, image: m.image, w: m.w, h: m.h, marks: m.marks.filter(k => k.vis !== 'dm'),
+    fog: m.fog && m.fog.on ? m.fog : null, sentAt: state.shownMap.sentAt };
 }
 function pushMapSoon(delay = 300) {
   if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
@@ -4964,7 +5083,7 @@ function renderPvTab() {
     pvViewer = makeViewer($('#pvStage'), $('#pvCanvas'));
     pvViewer.onTap = pt => {
       const cur = state.pvMapData; if (!cur) return;
-      const hit = hitMark(cur, cur.marks || [], pt, pvViewer.s);
+      const hit = isFogged(cur, pt) ? null : hitMark(cur, cur.marks || [], pt, pvViewer.s);  // nothing under fog can be tapped
       const panel = $('#pvPinNote');
       if (!hit || hit.k !== 'pin' || !(hit.t || hit.n)) { panel.hidden = true; return; }
       const title = $('#pvPinTitle');
@@ -4976,7 +5095,7 @@ function renderPvTab() {
     };
   }
   loadMapInto(pvViewer, $('#pvMapImg'), $('#pvSvg'), m);
-  $('#pvSvg').innerHTML = marksSvg(m, m.marks || [], false);
+  $('#pvSvg').innerHTML = marksSvg(m, m.marks || [], false) + fogSvg(m, false, 'pv');  // fog on top: it hides marks too
   requestAnimationFrame(() => { if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
 }
 
@@ -5058,7 +5177,8 @@ async function connect() {
   db.collection('maps').onSnapshot(snap => {
     const local = state.maps.find(m => m.id === mapDirtyId);  // keep marks that are still waiting to save
     state.maps = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(m => m.image)
-      .map(m => ({ ...m, name: str(m.name) || 'Map', marks: m.id === mapDirtyId && local ? local.marks : cleanMarks(m.marks) }));
+      .map(m => ({ ...m, name: str(m.name) || 'Map', marks: m.id === mapDirtyId && local ? local.marks : cleanMarks(m.marks),
+        fog: m.id === mapDirtyId && local ? local.fog : cleanFog(m.fog) }));
     if ($('#app').dataset.tab === 'maps') renderMaps();
   }, () => {});
   // Which map the players are looking at (the website keeps it in public/map; claude.ai in the player page).
