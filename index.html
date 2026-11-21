@@ -456,7 +456,11 @@ button.cb-pic { cursor: zoom-in; }
 .cb.current .cb-pic { border-color: var(--accent); }
 .cb-init { width: 100%; height: 44px; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 1.1rem; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
 .cb-main { min-width: 0; display: grid; gap: 3px; }
-.cb-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cb-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+/* The name looks like plain text; tap it to rename (a box appears while editing). */
+.cb-nm { flex: 0 1 auto; min-width: 3ch; width: auto; max-width: 100%; field-sizing: content; padding: 1px 4px; margin-left: -5px; border: 1px solid transparent; border-radius: 6px; background: transparent; font: inherit; font-weight: 700; color: inherit; text-overflow: ellipsis; }
+.cb-nm:hover { border-color: var(--line); }
+.cb-nm:focus { border-color: var(--accent); background: var(--bg); outline: none; }
 .cb-sub { font-size: .86rem; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pc-tag, .down-tag { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; border-radius: 999px; vertical-align: 2px; margin-left: 4px; }
 .pc-tag { background: var(--sunk); color: var(--muted); }
@@ -1431,7 +1435,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261121-134723';
+const APP_BUILD = '20261121-135903';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3562,7 +3566,7 @@ function syncPlayersIfStale() {
 }
 function publicEnc() {
   // Hidden monsters (and their rolls) never reach the players. On a hidden monster's turn nobody is highlighted.
-  const hiddenNames = new Set(state.enc.list.filter(c => c.hidden).map(c => c.name));
+  const hiddenNames = new Set(state.enc.list.filter(c => c.hidden).flatMap(c => [c.name, ...(c.oldNames || [])]));
   const cur = encFind(state.enc.turnId);
   return {
     round: state.enc.round || 0,
@@ -3807,7 +3811,7 @@ function cbRow(c, current) {
     <input class="cb-init" id="init-${c.id}" type="number" value="${c.init}" data-cb-init="${c.id}" aria-label="Initiative for ${esc(c.name)}">
     ${cbPic(c)}
     <div class="cb-main">
-      <div class="cb-name">${esc(c.name)}${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}${c.hidden ? '<span class="hide-tag">HIDDEN</span>' : ''}</div>
+      <div class="cb-name"><input class="cb-nm" id="name-${c.id}" type="text" maxlength="60" size="${Math.max(3, c.name.length + 1)}" autocomplete="off" spellcheck="false" value="${esc(c.name)}" data-cb-name="${c.id}" aria-label="Name of ${esc(c.name)}" title="Tap to rename">${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}${c.hidden ? '<span class="hide-tag">HIDDEN</span>' : ''}</div>
       ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="text" maxlength="8" autocomplete="off" value="${c.ac != null ? esc(String(c.ac)) : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
       ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button>
         <label class="cb-hide" title="Hidden monsters don't appear on the players' screen"><input type="checkbox" data-cb-hide="${c.id}"${c.hidden ? ' checked' : ''}> Hidden</label></div>
@@ -4488,6 +4492,15 @@ $('#cbList').addEventListener('change', e => {
     toast(c.hidden ? `${c.name} is hidden from the players` : `${c.name} is now visible to the players`);
     return;
   }
+  // Renamed right in the tracker. The players see the new name; rolls already made keep the old one
+  // (and stay hidden for a hidden monster, see oldNames).
+  if (e.target.dataset.cbName) {
+    const c = encFind(e.target.dataset.cbName), v = str(e.target.value).slice(0, 60);
+    if (!c) return;
+    if (!v) { e.target.value = c.name; return; }
+    if (v !== c.name) { c.oldNames = [...new Set([...(c.oldNames || []), c.name])].slice(-5); c.name = v; encChanged(); schedulePlayersUpdate(300); }
+    return;
+  }
   // A player's AC, changed right in the tracker (Shield, a buff…). Empty clears it.
   if (e.target.dataset.cbAc) {
     const c = encFind(e.target.dataset.cbAc), v = acOrNull(e.target.value);
@@ -4499,7 +4512,8 @@ $('#cbList').addEventListener('change', e => {
   if (c && v != null && v !== c.init) { c.init = v; encChanged(); }
 });
 $('#cbList').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches('.cb-init, .cb-ac')) e.target.blur();
+  if (e.key === 'Enter' && e.target.matches('.cb-init, .cb-ac, .cb-nm')) e.target.blur();
+  if (e.key === 'Escape' && e.target.matches('.cb-nm')) { const c = encFind(e.target.dataset.cbName); if (c) e.target.value = c.name; e.target.blur(); }
 });
 $('#pickQ').addEventListener('input', renderPickList);
 $('#baseQ').addEventListener('input', renderBaseList);
