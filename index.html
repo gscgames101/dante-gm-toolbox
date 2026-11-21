@@ -424,7 +424,42 @@ button.pv-thumb:hover { border-color: var(--accent); }
 /* Tabs + initiative tracker */
 .app[data-tab="init"] .panes, .app[data-tab="init"] #newBtn { display: none; }
 .app[data-tab="bestiary"] .initview { display: none; }
-.tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--bg); }
+/* Tokens tab */
+.app[data-tab="tokens"] .panes, .app[data-tab="tokens"] .initview, .app[data-tab="tokens"] .mapsview, .app[data-tab="tokens"] #newBtn { display: none; }
+.app:not([data-tab="tokens"]) .tokensview { display: none; }
+.tokensview { flex: 1; min-height: 0; padding-block: 12px 32px; }
+.tok-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.tok-head h2 { flex: 1; font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--accent); }
+.tok-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+.tok-grid.small { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); max-height: 55vh; overflow-y: auto; padding: 4px; }
+.tok-card { display: grid; justify-items: center; gap: 6px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: center; min-width: 0; }
+.tok-card:hover { border-color: var(--muted); }
+.tok-card b { font-size: .95rem; overflow-wrap: anywhere; }
+.tok-card small { font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; }
+.tok-av { width: 72px; height: 72px; border-radius: 50%; border: 4px solid var(--rim, #888); background: var(--sunk); overflow: hidden; display: grid; place-items: center; font-family: var(--display); font-size: 1.8rem; color: var(--muted); flex: none; }
+.tok-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tok-grid.small .tok-av { width: 56px; height: 56px; font-size: 1.4rem; }
+.tok-dlg { max-width: 460px; }
+.tok-dlg-row { display: flex; gap: 16px; align-items: center; }
+.tok-dlg-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.tok-prev { width: 96px; height: 96px; border-radius: 50%; border: 5px solid var(--rim, #888); background: var(--sunk); overflow: hidden; display: grid; place-items: center; font-family: var(--display); font-size: 2.2rem; color: var(--muted); flex: none; }
+.tok-prev img { width: 100%; height: 100%; object-fit: cover; }
+/* Tokens on a map: positioned in map pixels inside the zoomed canvas, so they keep their size relative to the map. */
+.map-toks { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.tok { position: absolute; border-radius: 50%; border: solid var(--rim, #888); background: #222; overflow: visible; display: grid; place-items: center; pointer-events: auto; cursor: grab; box-shadow: 0 2px 6px #000a; touch-action: none; }
+.pv-toks .tok { pointer-events: none; }
+.tok img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.tok > span { color: #eee; font-family: var(--display); line-height: 1; pointer-events: none; }
+.tok.sel { outline: 3px dashed #fff; outline-offset: 3px; }
+.tok.turn { box-shadow: 0 0 0 4px #fff, 0 0 18px 8px var(--rim, #fff); }
+.tok.hid { opacity: .55; border-style: dashed; }
+.tok.fogged { opacity: .7; }
+.tok-bar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 8px; }
+.tok-bar[hidden] { display: none; }
+.tok-bar-nm { font-weight: 700; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tok-size { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); }
+.tok-size input { width: 140px; accent-color: var(--accent); }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--bg); }
 .tabs button { min-height: 46px; border: 0; background: transparent; font-weight: 700; color: var(--muted); border-top: 3px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tabs button[aria-pressed="true"] { color: var(--accent); border-top-color: var(--accent); }
 .tab-badge { font-family: var(--mono); font-size: .72rem; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
@@ -661,7 +696,7 @@ button.cb-pic { cursor: zoom-in; }
   .initview { grid-template-columns: clamp(380px, 32vw, 680px) 1fr; }
   .detail-wrap { max-width: 1240px; }
   .detail-wrap .sb, .detail-wrap .notes, .cb-card { max-width: none; }
-  .tabs { grid-template-columns: repeat(3, minmax(0, 300px)); justify-content: center; }
+  .tabs { grid-template-columns: repeat(4, minmax(0, 260px)); justify-content: center; }
   .sheet-in { max-width: 960px; }
   /* Players' screen: no rolls yet = one centred column; with rolls = turn order on the left,
      latest + earlier rolls stacked on the right ("dense" lets the list fill the left beside them). */
@@ -812,6 +847,12 @@ button.cb-pic { cursor: zoom-in; }
           </div>
           <button type="button" class="btn small ghost" data-act="map-undo" id="mapUndo" disabled>↶ Undo</button>
           <button type="button" class="btn small ghost" data-act="map-fit">Fit</button>
+          <button type="button" class="btn small" data-act="map-add-token" title="Put a token on the map (drag it with the Move tool)">+ Token</button>
+          <div class="tok-bar" id="tokBar" hidden>
+            <span class="tok-bar-nm" id="tokBarName"></span>
+            <label class="tok-size">Size <input type="range" id="tokSize" min="1" max="40" step="0.5" aria-label="Token size"></label>
+            <button type="button" class="btn small ghost danger" data-act="tok-remove">Remove from map</button>
+          </div>
           <div class="fog-row" id="fogRow">
             <button type="button" class="btn small" data-act="fog-toggle" id="fogToggle" aria-pressed="false" title="Hide the map from players and reveal it room by room">Fog: off</button>
             <span class="fog-tools" id="fogTools" hidden>
@@ -828,19 +869,29 @@ button.cb-pic { cursor: zoom-in; }
             </span>
           </div>
         </div>
-        <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+        <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks" id="mapToks"></div></div></div>
       </div>
     </section>
+  </main>
+
+  <main class="pane gutter tokensview" id="tokensView" aria-label="Tokens">
+    <div class="tok-head">
+      <h2>Tokens</h2>
+      <button type="button" class="btn primary" data-act="tok-new">+ New token</button>
+    </div>
+    <p class="hint" style="margin:0 0 12px">Make tokens here, then put them on a map with <b>+ Token</b> in the Maps tab. Link a token to someone in the initiative and it glows on their turn; a token linked to a hidden monster stays hidden from the players.</p>
+    <div class="tok-grid" id="tokGrid"></div>
+    <div class="empty" id="tokEmpty" hidden><h3>No tokens yet</h3><p>Tap <b>+ New token</b>, pick a picture, a rim colour and a name.</p></div>
   </main>
 
   <main class="pane gutter player-view" id="playerView" aria-label="Initiative order">
     <section class="pv-map" id="pvMap" hidden>
       <div class="pv-map-body">
-        <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg></div></div>
+        <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks pv-toks" id="pvToks"></div></div></div>
         <aside class="pv-pin" id="pvPinNote" aria-label="Pin" aria-live="polite" hidden>
           <div class="pv-pin-head">
             <span class="pv-pin-dot" id="pvPinDot"></span>
-            <span class="pv-pin-kicker">Pin</span>
+            <span class="pv-pin-kicker" id="pvPinKicker">Pin</span>
             <button type="button" class="icon-btn" data-act="pv-pin-close" aria-label="Close" title="Close">✕</button>
           </div>
           <div class="pv-pin-field"><span class="pv-pin-label">Title</span><h3 id="pvPinTitle"></h3></div>
@@ -884,6 +935,7 @@ button.cb-pic { cursor: zoom-in; }
     <button data-tab-go="bestiary" aria-pressed="true">Bestiary</button>
     <button data-tab-go="init" aria-pressed="false">Initiative <span class="tab-badge" id="encBadge" hidden></span></button>
     <button data-tab-go="maps" aria-pressed="false">Maps <span class="tab-badge" id="mapBadge" hidden>LIVE</span></button>
+    <button data-tab-go="tokens" aria-pressed="false">Tokens</button>
   </nav>
 
   <footer class="tray gutter" id="tray">
@@ -1214,6 +1266,43 @@ button.cb-pic { cursor: zoom-in; }
   </div>
 </div>
 
+<div class="sheet dim" id="tokSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box tok-dlg" id="tokForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h" id="tokDlgTitle">New token</h3>
+      <div class="tok-dlg-row">
+        <div class="tok-prev" id="tokPrev"></div>
+        <div class="tok-dlg-btns">
+          <label class="btn small file-btn" for="tokFile"><span id="tokPick">Choose picture</span><input id="tokFile" type="file" accept="image/*"></label>
+          <button type="button" class="btn small ghost" data-act="tok-paste">Paste</button>
+          <button type="button" class="btn small ghost danger" data-act="tok-pic-remove" id="tokPicRemove" hidden>Remove picture</button>
+        </div>
+      </div>
+      <div class="field"><label for="tokName">Name</label><input id="tokName" maxlength="40" placeholder="e.g. Aria, Goblin boss"></div>
+      <div class="field"><span class="lbl">Rim colour</span><div class="swatches" id="tokRims" role="radiogroup" aria-label="Rim colour"></div></div>
+      <div class="field"><label for="tokLink">Linked to (initiative)</label><select id="tokLink"></select></div>
+      <p class="err" id="tokErr" hidden></p>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="tok-delete" id="tokDel" hidden>Delete</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="tok-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet dim" id="tokPickSheet" hidden>
+  <div class="gutter">
+    <div class="confirm-box tok-dlg">
+      <h3 class="dlg-h">Put a token on the map</h3>
+      <div class="tok-grid small" id="tokPickGrid"></div>
+      <p class="hint" id="tokPickEmpty" style="margin:0" hidden>No tokens yet. Make some in the <b>Tokens</b> tab.</p>
+      <div class="row-end"><button type="button" class="btn" data-act="tok-pick-close">Close</button></div>
+    </div>
+  </div>
+</div>
+
 <div class="sheet dim" id="mapDetSheet" hidden>
   <div class="gutter">
     <form class="confirm-box" id="mapDetForm" autocomplete="off" novalidate>
@@ -1435,7 +1524,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261121-135903';
+const APP_BUILD = '20261121-142108';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3066,15 +3155,16 @@ async function exportForSite() {
     state.monsters.forEach(m => { add(m.image); add(m.thumb); });
     state.groups.forEach(g => (g.players || []).forEach(p => { add(p.image); add(p.thumb); }));
     state.maps.forEach(m => { add(m.image); add(m.thumb); });
+    state.tokens.forEach(t => { add(t.image); add(t.thumb); });
     const assets = {}; let i = 0, missing = 0;
     for (const id of ids) {
       siteMsg('#siteExportMsg', `Packing pictures… ${++i} of ${ids.size}`);
       try { assets[id] = await picData(id); } catch { missing++; }
     }
-    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, assets };
+    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, tokens: state.tokens, assets };
     const json = JSON.stringify(data);
     const name = `dante-gm-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
-    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
+    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${state.tokens.length} tokens, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
     if (SITE) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = name;
@@ -3115,10 +3205,11 @@ async function importFile(file) {
   if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
   const monsters = data.monsters.filter(m => m && m.id && m.name), books = (data.books || []).filter(b => b && b.id && b.name), groups = (data.groups || []).filter(g => g && g.id);
   const mapFolders = (data.mapFolders || []).filter(f => f && f.id && f.name), maps = (data.maps || []).filter(m => m && m.id && isAssetId(m.image));
+  const tokens = (data.tokens || []).filter(t => t && t.id && t.name);
   const assets = Object.entries(data.assets || {}).filter(([id, d]) => isAssetId(id) && typeof d === 'string' && d.startsWith('data:image/'));
   const what = `${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${maps.length} maps and ${assets.length} pictures`;
-  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps));
-  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps));
+  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps, tokens));
+  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps, tokens));
 }
 /* ---------- 5etools files ----------
    5etools stores monsters as structured data with its own {@tag ...} markup in the text. This turns each one
@@ -3347,7 +3438,7 @@ async function addMonsterList(list) {
 }
 /* claude.ai app: add and update from the file, never delete. Pictures the app already has are reused;
    the rest are uploaded and the monsters point at the new copies. */
-async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], maps = []) {
+async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = []) {
   const db = state.db, input = $('#siteImportFile'); input.disabled = true;
   try {
     const map = {}; let i = 0;
@@ -3368,7 +3459,8 @@ async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], m
       ...mapFolders.map(({ id, ...f }) => () => db.collection('mapFolders').doc(id).set({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() })),
       ...maps.filter(m => fix(m.image)).map(({ id, ...m }) => () => db.collection('maps').doc(id).set({
         name: str(m.name) || 'Map', folderId: m.folderId || null, image: fix(m.image), thumb: fix(m.thumb) || '',
-        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), createdAt: m.createdAt || Date.now() }))
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), tokens: cleanToks(m.tokens), createdAt: m.createdAt || Date.now() })),
+      ...tokens.map(t => () => { const c = cleanTokLib({ ...t, image: fix(t.image), thumb: fix(t.thumb) }); const { id, ...rest } = c; return db.collection('tokens').doc(t.id).set(rest); })
     ];
     let done = 0; const total = jobs.length;
     const worker = async () => { for (let j; (j = jobs.shift());) { await j(); siteMsg('#siteImportMsg', `Saving… ${++done} of ${total}`); } };
@@ -3380,7 +3472,7 @@ async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], m
   } finally { input.disabled = false; }
 }
 /* Website: make it match the file exactly (it's a copy of the claude.ai app). */
-function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps = []) {
+function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = []) {
   return (async () => {
     const db = state.db, input = $('#siteImportFile'); input.disabled = true;
     try {
@@ -3405,7 +3497,8 @@ function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps 
       mirror('monsters', monsters, state.monsters, ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
       mirror('mapFolders', mapFolders, state.mapFolders, ({ id, ...f }) => ({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() }));
       mirror('maps', maps, state.maps, ({ id, ...m }) => ({ name: str(m.name) || 'Map', folderId: m.folderId || null, image: m.image, thumb: m.thumb || '',
-        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), createdAt: m.createdAt || Date.now() }));
+        w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), tokens: cleanToks(m.tokens), createdAt: m.createdAt || Date.now() }));
+      mirror('tokens', tokens, state.tokens, t => { const { id, ...rest } = cleanTokLib(t); return rest; });
       for (let i = 0; i < ops.length; i += 100) {  // map documents can be large, so smaller batches
         const b = db.batch(); ops.slice(i, i + 100).forEach(f => f(b)); await b.commit();
       }
@@ -3602,6 +3695,8 @@ const pvRollText = r => `<span class="what">
 </span>`;
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
+  // whose turn it is: their token glows on the players' map
+  if (d && (d.turnId || null) !== state.pvTurnId) { state.pvTurnId = d.turnId || null; if (state.pvMapData && !$('#pvMap').hidden) $('#pvToks').innerHTML = tokensHtml(state.pvMapData.tokens || [], { turn: state.pvTurnId }); }
   const list = (d && Array.isArray(d.list)) ? d.list.filter(c => c && c.name) : [];
   const ti = list.findIndex(c => c.id === d.turnId);
   let next = -1;
@@ -3928,6 +4023,7 @@ function setTab(tab) {
   document.querySelectorAll('[data-tab-go]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tabGo === tab)));
   ls.set('pb-tab', tab);
   if (tab === 'init') renderEncounter();
+  if (tab === 'tokens') renderTokens();
   if (tab === 'maps') { renderMaps(); requestAnimationFrame(() => dmViewer && curMap() && dmViewer.fit()); }
 }
 function showConfirm(msg, yesLabel, fn) {
@@ -4044,7 +4140,8 @@ async function uploadPlayerPic(pid, file) {
 function assetUsed(id) {
   return state.monsters.some(m => m.image === id || m.thumb === id)
     || state.groups.some(g => g.players.some(p => p.image === id || p.thumb === id))
-    || state.enc.list.some(c => c.img === id || c.thumb === id);
+    || state.enc.list.some(c => c.img === id || c.thumb === id)
+    || state.tokens.some(t => t.image === id || t.thumb === id) || state.tokEd && (state.tokEd.image === id || state.tokEd.thumb === id);
 }
 async function dropUnused(id) { if (!isAssetId(id) || !state.assets || assetUsed(id)) return; try { await state.assets.delete(id); } catch {} }
 function cancelGroupEdit() {
@@ -4170,6 +4267,9 @@ document.addEventListener('click', async ev => {
   // maps
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
+  if (t.dataset.tokedit) { openTokDlg(tokLib(t.dataset.tokedit)); return; }
+  if (t.dataset.tokpick) { placeToken(t.dataset.tokpick); return; }
+  if (t.dataset.tokrim && state.tokEd) { state.tokEd.rim = t.dataset.tokrim; renderTokDlg(); return; }
   if (t.dataset.mtool) { if (dmViewer) dmViewer.tool.cancelPoly(); state.mapTool = t.dataset.mtool; renderMapWork(); return; }
   if (t.dataset.msize) { state.mapSize = t.dataset.msize; renderMapWork(); return; }
   if (t.dataset.mvis) { state.mapVis = t.dataset.mvis; renderMapWork(); return; }
@@ -4257,6 +4357,14 @@ document.addEventListener('click', async ev => {
     case 'map-send': sendMapToPlayers(); break;
     case 'map-stop': stopShowingMap(); break;
     case 'map-undo': undoMarks(); break;
+    case 'map-add-token': openTokPick(); break;
+    case 'tok-pick-close': $('#tokPickSheet').hidden = true; break;
+    case 'tok-remove': { const id = state.selTok; state.selTok = null; changeTokens(list => list.filter(x => x.id !== id)); break; }
+    case 'tok-new': openTokDlg(null); break;
+    case 'tok-cancel': cancelTok(); break;
+    case 'tok-delete': deleteTok(); break;
+    case 'tok-paste': pasteTokPic(); break;
+    case 'tok-pic-remove': if (state.tokEd) { state.tokEd.image = ''; state.tokEd.thumb = ''; renderTokDlg(); } break;
     case 'fog-toggle': {
       // On: everything hidden at first (or as it was when fog was last on). Off: players see the whole map.
       const m = curMap(); if (!m) break;
@@ -4544,6 +4652,11 @@ document.addEventListener('keydown', e => {
   // Ctrl/Cmd+Z undoes the last mark while drawing on a map
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && $('#app').dataset.tab === 'maps' && state.role === 'dm'
       && !e.target.closest('input, textarea, select, [contenteditable]') && document.querySelectorAll('.sheet:not([hidden])').length === 0) { e.preventDefault(); undoMarks(); }
+  // Delete removes the selected token from the map
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selTok && $('#app').dataset.tab === 'maps' && state.role === 'dm'
+      && !e.target.closest('input, textarea, select, [contenteditable]') && document.querySelectorAll('.sheet:not([hidden])').length === 0) {
+    e.preventDefault(); const id = state.selTok; state.selTok = null; changeTokens(list => list.filter(x => x.id !== id));
+  }
 });
 $('#siteImportFile').addEventListener('change', e => importFile(e.target.files && e.target.files[0]));
 
@@ -4891,7 +5004,7 @@ function renderMapWork() {
   document.querySelectorAll('[data-mtool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mtool === state.mapTool)));
   $('#mapStage').classList.toggle('drawing', state.mapTool !== 'move');
   if (!dmViewer) {
-    dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => editMarkAt(pt);
+    dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => { if (state.selTok) { state.selTok = null; drawDmTokens(); } editMarkAt(pt); };
     // Polygon fog tool: a line follows the pointer; double-click or Enter closes the shape, Esc cancels it.
     $('#mapStage').addEventListener('pointermove', e => { if (!e.buttons) dmViewer.tool.hover(e); });
     $('#mapStage').addEventListener('dblclick', () => dmViewer.tool.finishPoly());
@@ -4902,16 +5015,17 @@ function renderMapWork() {
   }
   loadMapInto(dmViewer, $('#mapImg'), $('#mapSvg'), m);
   drawDmMarks();
+  drawDmTokens();
 }
 function openMap(id) {
-  if (state.mapId !== id) state.mapUndo = [];
+  if (state.mapId !== id) { state.mapUndo = []; state.selTok = null; }
   state.mapId = id;
   $('#mapsView').dataset.mview = 'map';
   renderMaps();
   requestAnimationFrame(() => dmViewer && dmViewer.fit());
 }
 /* Change the current map's marks (with undo), save shortly after, and update the players if it's on their screen. */
-const mapSnap = m => JSON.stringify({ marks: m.marks, fog: m.fog || null });  // one undo step (marks + fog)
+const mapSnap = m => JSON.stringify({ marks: m.marks, fog: m.fog || null, tokens: m.tokens || [] });  // one undo step (marks, fog, tokens)
 function pushMapUndo(m) { state.mapUndo.push(mapSnap(m)); if (state.mapUndo.length > 60) state.mapUndo.shift(); }
 function changeMarks(fn) {
   const m = curMap(); if (!m || !state.canWrite) return;
@@ -4931,7 +5045,7 @@ function changeFog(fn) {
 function saveMarksSoon(m) {
   mapDirtyId = m.id; clearTimeout(mapSaveT);
   mapSaveT = setTimeout(async () => {
-    try { await state.db.collection('maps').doc(m.id).update({ marks: m.marks, fog: m.fog || null, updatedAt: Date.now() }); }
+    try { await state.db.collection('maps').doc(m.id).update({ marks: m.marks, fog: m.fog || null, tokens: m.tokens || [], updatedAt: Date.now() }); }
     catch { toast('Couldn’t save the map marks. They’re still here; they’ll save with the next change.'); }
     finally { if (mapDirtyId === m.id) mapDirtyId = null; }
   }, 500);
@@ -4940,13 +5054,13 @@ function saveMarksSoon(m) {
 function undoMarks() {
   const m = curMap(); if (!m || !state.mapUndo.length) return;
   const o = JSON.parse(state.mapUndo.pop());
-  if (Array.isArray(o)) m.marks = o; else { m.marks = o.marks; m.fog = o.fog; }
+  if (Array.isArray(o)) m.marks = o; else { m.marks = o.marks; m.fog = o.fog; m.tokens = o.tokens || []; }
   renderMapWork(); $('#mapUndo').disabled = !state.mapUndo.length;
   saveMarksSoon(m);
 }
 const newMarkId = () => Math.random().toString(36).slice(2, 10);
 function dmTool() {
-  let stroke = null, start = null, fogOp = null, poly = null, hoverPt = null;
+  let stroke = null, start = null, fogOp = null, poly = null, hoverPt = null, tokDrag = null;
   const sizeK = () => ({ s: 1, m: 2, l: 4 })[state.mapSize];
   const isFogTool = t => /^(reveal|hide)-(rect|brush)$/.test(t);
   const isPolyTool = t => /^(reveal|hide)-poly$/.test(t);
@@ -4972,7 +5086,17 @@ function dmTool() {
     finishPoly, cancelPoly,
     hover(e) { if (!poly) return; hoverPt = dmViewer.toImage(e); drawPoly(); },
     down(e) {
-      const m = curMap(); if (!m || !state.canWrite || state.mapTool === 'move') return false;
+      const m = curMap(); if (!m || !state.canWrite) return false;
+      // A token under the pointer with the Move tool: select it and drag it.
+      const tokEl = state.mapTool === 'move' && e.button === 0 && e.target && e.target.closest ? e.target.closest('.tok[data-tok]') : null;
+      if (tokEl) {
+        const t = (m.tokens || []).find(x => x.id === tokEl.dataset.tok); if (!t) return false;
+        const p0 = dmViewer.toImage(e);
+        tokDrag = { t, dx: p0.x - t.x, dy: p0.y - t.y, before: mapSnap(m), moved: false, cx: e.clientX, cy: e.clientY };
+        if (state.selTok !== t.id) { state.selTok = t.id; drawDmTokens(); }
+        return true;
+      }
+      if (state.mapTool === 'move') return false;
       const pt = dmViewer.toImage(e); start = pt;
       if (isPolyTool(state.mapTool)) {
         if (!m.fog || !m.fog.on) { toast('Turn fog on first.'); return false; }
@@ -4997,6 +5121,16 @@ function dmTool() {
       return true;
     },
     move(e) {
+      if (tokDrag) {
+        const d = tokDrag, m = curMap(); if (!m) return;
+        if (!d.moved && Math.hypot(e.clientX - d.cx, e.clientY - d.cy) < 4) return;
+        d.moved = true;
+        const pt = dmViewer.toImage(e), W = m.w || 1000, H = m.h || 1000;
+        d.t.x = Math.round(Math.min(W, Math.max(0, pt.x - d.dx))); d.t.y = Math.round(Math.min(H, Math.max(0, pt.y - d.dy)));
+        const el = $('#mapToks').querySelector(`[data-tok="${d.t.id}"]`);
+        if (el) { el.style.left = (d.t.x - d.t.s / 2) + 'px'; el.style.top = (d.t.y - d.t.s / 2) + 'px'; }
+        return;
+      }
       if (fogOp) {
         const m = curMap(), pt = dmViewer.toImage(e);
         if (fogOp.k === 'rect') {
@@ -5021,6 +5155,12 @@ function dmTool() {
     },
     up(e) {
       const m = curMap(); if (!m) return;
+      if (tokDrag) {
+        const d = tokDrag; tokDrag = null;
+        if (d.moved) { state.mapUndo.push(d.before); if (state.mapUndo.length > 60) state.mapUndo.shift(); $('#mapUndo').disabled = false; saveMarksSoon(m); }
+        drawDmTokens();
+        return;
+      }
       const pt = dmViewer.toImage(e);
       if (isPolyTool(state.mapTool)) {
         const s = dmViewer.s;
@@ -5058,7 +5198,7 @@ function dmTool() {
           s: Math.round(24 * mapBase(m) * sizeK()), t: '', n: '' }, true);
       }
     },
-    cancel() { stroke = null; fogOp = null; if (poly) drawPoly(); else drawDmMarks(); }
+    cancel() { stroke = null; fogOp = null; if (tokDrag) { tokDrag = null; drawDmTokens(); } if (poly) drawPoly(); else drawDmMarks(); }
   };
 }
 /* Tapping a pin or a text with the Move tool opens it for editing. */
@@ -5126,13 +5266,16 @@ function publicMap() {
     return pm && pm.id === state.shownMap.id ? pm : null;
   }
   return { id: m.id, name: m.name, image: m.image, w: m.w, h: m.h, marks: m.marks.filter(k => k.vis !== 'dm'),
-    fog: m.fog && m.fog.on ? m.fog : null, sentAt: state.shownMap.sentAt };
+    fog: m.fog && m.fog.on ? m.fog : null,
+    // tokens: not ones linked to a hidden monster, and not ones under fog
+    tokens: resolveTokens(m).filter(t => !t.hidden && !isFogged(m, t)).map(({ hidden, ...t }) => t),
+    sentAt: state.shownMap.sentAt };
 }
 function pushMapSoon(delay = 300) {
   if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
   clearTimeout(mapPushT);
   mapPushT = setTimeout(async () => {
-    try { await state.db.doc('public/map').set({ map: publicMap(), at: Date.now(), build: APP_BUILD }); }
+    try { const map = publicMap(); mapSentKey = JSON.stringify(map); await state.db.doc('public/map').set({ map, at: Date.now(), build: APP_BUILD }); }
     catch { toast('Couldn’t update the players’ map. Try Send again.'); }
   }, delay);
 }
@@ -5174,6 +5317,13 @@ function renderPvTab() {
     pvViewer = makeViewer($('#pvStage'), $('#pvCanvas'));
     pvViewer.onTap = pt => {
       const cur = state.pvMapData; if (!cur) return;
+      // A token under the tap: show its name.
+      const tk = (cur.tokens || []).slice().reverse().find(t => Math.hypot(pt.x - t.x, pt.y - t.y) <= t.s / 2);
+      if (tk) {
+        $('#pvPinKicker').textContent = 'Token'; $('#pvPinTitle').textContent = tk.name; $('#pvPinTitle').classList.remove('none');
+        $('#pvPinNoteWrap').hidden = true; $('#pvPinDot').style.background = tk.rim; $('#pvPinNote').hidden = false; return;
+      }
+      $('#pvPinKicker').textContent = 'Pin';
       const hit = isFogged(cur, pt) ? null : hitMark(cur, cur.marks || [], pt, pvViewer.s);  // nothing under fog can be tapped
       const panel = $('#pvPinNote');
       if (!hit || hit.k !== 'pin' || !(hit.t || hit.n)) { panel.hidden = true; return; }
@@ -5187,7 +5337,211 @@ function renderPvTab() {
   }
   loadMapInto(pvViewer, $('#pvMapImg'), $('#pvSvg'), m);
   $('#pvSvg').innerHTML = marksSvg(m, m.marks || [], false) + fogSvg(m, false, 'pv');  // fog on top: it hides marks too
+  $('#pvToks').innerHTML = tokensHtml(m.tokens || [], { turn: state.pvTurnId });
   requestAnimationFrame(() => { if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
+}
+
+/* ---------- tokens ----------
+   The library (tokens/<id>: {name, image, thumb, rim, link}) is made in the Tokens tab. On a map, placed tokens are
+   map.tokens = [{id, tid, x, y, s}]: which library token, its centre and its diameter, all in map pixels (so a token
+   keeps its size relative to the map at any zoom). link = the id of someone in the initiative. */
+const RIM_COLORS = ['#e2463a', '#f08c2e', '#f2c53d', '#7cc142', '#2e9e57', '#2bb0a6', '#3a7be2', '#2c3e9e', '#8a4fd6', '#d64fa8', '#f4f1e8', '#1c1c1c'];
+state.tokens = []; state.tokEd = null; state.selTok = null; state.pvTurnId = null;
+const cleanTokLib = d => ({ id: d.id, name: str(d.name).slice(0, 40) || 'Token', image: isAssetId(d.image) ? d.image : '',
+  thumb: isAssetId(d.image) && isAssetId(d.thumb) ? d.thumb : '', rim: RIM_COLORS.includes(d.rim) ? d.rim : RIM_COLORS[0],
+  link: typeof d.link === 'string' ? d.link.slice(0, 64) : '', createdAt: num(d.createdAt, Date.now()) });
+const cleanToks = a => (Array.isArray(a) ? a : []).filter(t => t && typeof t.id === 'string' && typeof t.tid === 'string' && [t.x, t.y, t.s].every(Number.isFinite))
+  .map(t => ({ id: t.id, tid: t.tid, x: Math.round(t.x), y: Math.round(t.y), s: Math.max(4, Math.round(t.s)) }));
+const tokLib = id => state.tokens.find(t => t.id === id);
+// Placed tokens with their library details (DM side). hidden = linked to a hidden monster.
+function resolveTokens(m) {
+  return (m.tokens || []).map(t => {
+    const L = tokLib(t.tid); if (!L) return null;
+    const c = L.link ? encFind(L.link) : null;
+    return { id: t.id, x: t.x, y: t.y, s: t.s, name: L.name, img: L.thumb || L.image, rim: L.rim, link: c ? c.id : '', hidden: !!(c && c.hidden) };
+  }).filter(Boolean);
+}
+function tokensHtml(list, opt = {}) {
+  return list.map(t => {
+    const cls = ['tok', opt.sel === t.id && 'sel', t.hidden && 'hid', opt.turn && t.link === opt.turn && 'turn', opt.fog && opt.fog(t) && 'fogged'].filter(Boolean).join(' ');
+    return `<div class="${cls}" data-tok="${esc(t.id)}" title="${esc(t.name)}" style="left:${t.x - t.s / 2}px;top:${t.y - t.s / 2}px;width:${t.s}px;height:${t.s}px;border-width:${Math.max(2, Math.round(t.s * 0.07))}px;--rim:${t.rim}">`
+      + (isAssetId(t.img) ? `<img src="${imgSrc(t.img)}" alt="" draggable="false">` : `<span style="font-size:${Math.round(t.s * 0.45)}px">${esc((t.name || '?')[0].toUpperCase())}</span>`) + '</div>';
+  }).join('');
+}
+function drawDmTokens() {
+  const m = curMap(), el = $('#mapToks'); if (!el) return;
+  if (!m) { el.innerHTML = ''; $('#tokBar').hidden = true; return; }
+  el.innerHTML = tokensHtml(resolveTokens(m), { sel: state.selTok, turn: state.enc.turnId, fog: t => isFogged(m, t) });
+  const t = state.selTok && (m.tokens || []).find(x => x.id === state.selTok), L = t && tokLib(t.tid);
+  if (state.selTok && !t) state.selTok = null;
+  $('#tokBar').hidden = !(t && L && state.canWrite);
+  if (t && L) {
+    $('#tokBarName').textContent = L.name;
+    if (document.activeElement !== $('#tokSize')) $('#tokSize').value = (t.s / Math.min(m.w || 1000, m.h || 1000) * 100).toFixed(1);
+  }
+}
+function changeTokens(fn) {
+  const m = curMap(); if (!m || !state.canWrite) return;
+  pushMapUndo(m);
+  m.tokens = fn((m.tokens || []).slice());
+  drawDmTokens(); $('#mapUndo').disabled = false;
+  saveMarksSoon(m);
+}
+function placeToken(tid) {
+  const m = curMap(); if (!m || !dmViewer) return;
+  const W = m.w || 1000, H = m.h || 1000, r = $('#mapStage').getBoundingClientRect(), v = dmViewer;
+  const s = Math.round(Math.min(W, H) * 0.05), n = (m.tokens || []).length % 6;
+  // in the middle of what's on screen, nudged so several in a row don't stack exactly
+  const x = Math.min(W - s / 2, Math.max(s / 2, (r.width / 2 - v.x) / v.s + (n - 2.5) * s * 0.6));
+  const y = Math.min(H - s / 2, Math.max(s / 2, (r.height / 2 - v.y) / v.s));
+  const t = { id: newMarkId(), tid, x: Math.round(x), y: Math.round(y), s };
+  $('#tokPickSheet').hidden = true;
+  state.selTok = t.id; state.mapTool = 'move';
+  changeTokens(list => [...list, t]);
+  renderMapWork();
+  toast('Drag the token with the Move tool. The slider changes its size.');
+}
+function openTokPick() {
+  const list = [...state.tokens].sort((a, b) => a.name.localeCompare(b.name));
+  $('#tokPickEmpty').hidden = list.length > 0;
+  $('#tokPickGrid').innerHTML = list.map(t => `<button type="button" class="tok-card" data-tokpick="${esc(t.id)}">${tokAv(t)}<b>${esc(t.name)}</b></button>`).join('');
+  $('#tokPickSheet').hidden = false;
+}
+// Token size slider (percent of the map's shorter side). One undo step per slide.
+let tokSizeBefore = null;
+$('#tokSize').addEventListener('input', e => {
+  const m = curMap(), t = m && (m.tokens || []).find(x => x.id === state.selTok); if (!t) return;
+  if (!tokSizeBefore) tokSizeBefore = mapSnap(m);
+  t.s = Math.max(4, Math.round(+e.target.value / 100 * Math.min(m.w || 1000, m.h || 1000)));
+  drawDmTokens();
+});
+$('#tokSize').addEventListener('change', () => {
+  const m = curMap(); if (!m || !tokSizeBefore) return;
+  state.mapUndo.push(tokSizeBefore); tokSizeBefore = null; $('#mapUndo').disabled = false;
+  saveMarksSoon(m);
+});
+
+/* --- the Tokens tab --- */
+const tokAv = t => `<span class="tok-av" style="--rim:${t.rim}">${isAssetId(t.image) ? `<img src="${imgSrc(t.thumb || t.image)}" alt="" loading="lazy" decoding="async">` : esc((t.name || '?')[0].toUpperCase())}</span>`;
+function tokLinkLabel(t) {
+  if (!t.link) return 'Not linked';
+  const c = encFind(t.link);
+  return c ? `Linked: ${esc(c.name)}${c.hidden ? ' (hidden)' : ''}` : 'Linked creature isn’t in the fight';
+}
+function renderTokens() {
+  const list = [...state.tokens].sort((a, b) => a.name.localeCompare(b.name));
+  $('#tokEmpty').hidden = list.length > 0;
+  $('#tokGrid').innerHTML = list.map(t => `<button type="button" class="tok-card" data-tokedit="${esc(t.id)}">${tokAv(t)}<b>${esc(t.name)}</b><small>${tokLinkLabel(t)}</small></button>`).join('');
+}
+function openTokDlg(t) {
+  if (!state.canWrite) return;
+  state.tokEd = t ? { ...t, uploaded: [] } : { id: null, name: '', image: '', thumb: '', rim: RIM_COLORS[state.tokens.length % RIM_COLORS.length], link: '', uploaded: [] };
+  $('#tokDlgTitle').textContent = t ? 'Edit token' : 'New token';
+  $('#tokName').value = state.tokEd.name; $('#tokDel').hidden = !t; $('#tokErr').hidden = true;
+  const L = state.tokEd.link;
+  $('#tokLink').innerHTML = '<option value="">Not linked</option>'
+    + encSorted().map(c => `<option value="${esc(c.id)}">${esc(c.name)}${c.kind === 'pc' ? ' (player)' : ''}${c.hidden ? ' (hidden)' : ''}</option>`).join('')
+    + (L && !encFind(L) ? `<option value="${esc(L)}">(not in the current fight)</option>` : '');
+  $('#tokLink').value = L || '';
+  renderTokDlg(); $('#tokSheet').hidden = false; $('#tokName').focus();
+}
+function renderTokDlg() {
+  const e = state.tokEd; if (!e) return;
+  const p = $('#tokPrev'); p.style.setProperty('--rim', e.rim);
+  p.innerHTML = isAssetId(e.image) ? `<img src="${imgSrc(e.thumb || e.image)}" alt="">` : esc((str($('#tokName').value) || '?')[0].toUpperCase());
+  $('#tokPicRemove').hidden = !isAssetId(e.image);
+  $('#tokPick').textContent = e.uploading ? 'Uploading…' : isAssetId(e.image) ? 'Change picture' : 'Choose picture';
+  $('#tokRims').innerHTML = RIM_COLORS.map(c => `<button type="button" role="radio" data-tokrim="${c}" aria-checked="${e.rim === c}" aria-label="Rim ${c}" style="--sw:${c}"></button>`).join('');
+}
+async function tokUpload(file) {
+  const e = state.tokEd; if (!e || !file) return;
+  if (!state.assets) { showErr('#tokErr', 'Pictures can only be added by the toolbox owner.'); return; }
+  if (!file.type.startsWith('image/')) { showErr('#tokErr', 'That file isn’t a picture. Pick a JPG, PNG, WebP or GIF.'); return; }
+  e.uploading = true; renderTokDlg();
+  try {
+    const blob = await prepareImage(file);
+    const res = await state.assets.upload(blob, blob.type ? undefined : { type: 'image/jpeg' });
+    e.uploaded.push(res.id);
+    let th = '';
+    try { const tb = await makeThumb(blob); if (tb) { const tr = await state.assets.upload(tb); e.uploaded.push(tr.id); th = tr.id; } } catch {}
+    e.image = res.id; e.thumb = th;
+  } catch (err) {
+    showErr('#tokErr', err && err.code === 'too_large' ? 'That picture is too big (20 MB max).' : 'Couldn’t upload the picture. Check your connection and try again.');
+  }
+  e.uploading = false; renderTokDlg();
+}
+async function pasteTokPic() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) throw new Error('unsupported');
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find(t => t.startsWith('image/')); if (!type) continue;
+      const blob = await item.getType(type);
+      return tokUpload(new File([blob], 'pasted.' + (type.split('/')[1] || 'png'), { type }));
+    }
+    showErr('#tokErr', 'There’s no picture on your clipboard. Copy an image first, then tap Paste.');
+  } catch { toast('Press Ctrl+V now to paste the picture.'); }
+}
+async function saveTok(ev) {
+  ev.preventDefault();
+  const e = state.tokEd; if (!e) return;
+  if (e.uploading) { showErr('#tokErr', 'Wait for the picture to finish uploading, then save.'); return; }
+  const name = str($('#tokName').value).slice(0, 40);
+  if (!name) { showErr('#tokErr', 'Give the token a name.'); $('#tokName').focus(); return; }
+  if (!state.db) { showErr('#tokErr', 'Not connected, so the token can’t be saved right now.'); return; }
+  const old = e.id ? tokLib(e.id) : null;
+  const ref = old ? state.db.collection('tokens').doc(old.id) : state.db.collection('tokens').doc();
+  const data = { name, image: isAssetId(e.image) ? e.image : '', thumb: isAssetId(e.image) && isAssetId(e.thumb) ? e.thumb : '',
+    rim: e.rim, link: $('#tokLink').value || '', createdAt: old ? old.createdAt : Date.now() };
+  try {
+    await ref.set(data);
+    const keep = new Set([data.image, data.thumb]), drop = e.uploaded.filter(id => !keep.has(id));
+    if (old) [old.image, old.thumb].forEach(id => { if (isAssetId(id) && !keep.has(id)) drop.push(id); });
+    const rec = cleanTokLib({ ...data, id: ref.id }), i = state.tokens.findIndex(t => t.id === ref.id);
+    if (i >= 0) state.tokens[i] = rec; else state.tokens.push(rec);
+    state.tokEd = null; $('#tokSheet').hidden = true;
+    renderTokens(); drop.forEach(dropUnused); afterTokChange();
+    toast(old ? 'Token saved' : `Made the token “${name}”`);
+  } catch (err) { showErr('#tokErr', saveErrorText(err)); }
+}
+function cancelTok() {
+  const e = state.tokEd; state.tokEd = null; $('#tokSheet').hidden = true;
+  if (e) e.uploaded.forEach(dropUnused);
+}
+function deleteTok() {
+  const e = state.tokEd, t = e && tokLib(e.id); if (!t) return;
+  showConfirm(`Delete the token “${t.name}”? It also comes off every map it’s on.`, 'Delete', async () => {
+    try {
+      await state.db.collection('tokens').doc(t.id).delete();
+      state.tokens = state.tokens.filter(x => x.id !== t.id);
+      for (const m of state.maps.filter(m => (m.tokens || []).some(x => x.tid === t.id))) {
+        m.tokens = m.tokens.filter(x => x.tid !== t.id);
+        try { await state.db.collection('maps').doc(m.id).update({ tokens: m.tokens, updatedAt: Date.now() }); } catch {}
+      }
+      state.tokEd = null; $('#tokSheet').hidden = true;
+      [t.image, t.thumb].forEach(dropUnused);
+      renderTokens(); afterTokChange(); toast(`Deleted “${t.name}”`);
+    } catch (err) { showErr('#tokErr', saveErrorText(err)); }
+  });
+}
+function afterTokChange() {
+  if ($('#app').dataset.tab === 'maps') renderMapWork();
+  if (state.shownMap) pushMapSoon();
+}
+$('#tokForm').addEventListener('submit', saveTok);
+$('#tokFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; tokUpload(f); });
+$('#tokName').addEventListener('input', renderTokDlg);
+document.addEventListener('paste', e => {
+  if ($('#tokSheet').hidden || !state.tokEd) return;
+  const f = [...(e.clipboardData ? e.clipboardData.files : [])].find(f => f.type.startsWith('image/'));
+  if (f) { e.preventDefault(); tokUpload(f); }
+});
+// Website: the players' map follows changes that affect it (e.g. a linked monster hidden or shown) on its own.
+let mapSentKey = null;
+function checkMapScreen() {
+  if (!SITE || !state.shownMap || state.role !== 'dm' || !state.canWrite || !state.db || !state.loaded) return;
+  const k = JSON.stringify(publicMap());
+  if (mapSentKey === null) { mapSentKey = k; return; }
+  if (k !== mapSentKey) { mapSentKey = k; pushMapSoon(150); }
 }
 
 /* ---------- full screen ---------- */
@@ -5265,11 +5619,17 @@ async function connect() {
     state.mapFolders = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(f => f.name);
     if ($('#app').dataset.tab === 'maps') renderMaps();
   }, () => {});
+  db.collection('tokens').onSnapshot(snap => {
+    state.tokens = snap.docs.map(d => cleanTokLib({ ...d.data(), id: d.id }));
+    const tab = $('#app').dataset.tab;
+    if (tab === 'tokens') renderTokens(); else if (tab === 'maps') renderMapWork();
+  }, () => {});
   db.collection('maps').onSnapshot(snap => {
     const local = state.maps.find(m => m.id === mapDirtyId);  // keep marks that are still waiting to save
     state.maps = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(m => m.image)
       .map(m => ({ ...m, name: str(m.name) || 'Map', marks: m.id === mapDirtyId && local ? local.marks : cleanMarks(m.marks),
-        fog: m.id === mapDirtyId && local ? local.fog : cleanFog(m.fog) }));
+        fog: m.id === mapDirtyId && local ? local.fog : cleanFog(m.fog),
+        tokens: m.id === mapDirtyId && local ? local.tokens : cleanToks(m.tokens) }));
     if ($('#app').dataset.tab === 'maps') renderMaps();
   }, () => {});
   // Which map the players are looking at (the website keeps it in public/map; claude.ai in the player page).
@@ -5308,10 +5668,10 @@ state.groups = (ls.get('pb-groups', []) || []).filter(g => g && g.id).map(g => (
 state.book = ls.get('pb-book', 'all') || 'all';
 renderList(); renderDetail(); renderTray();
 state.shownMap = ls.get('pb-shown-map', null);
-setTab(['init', 'maps'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
+setTab(['init', 'maps', 'tokens'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
 setupFullscreen();
-if (SITE) setInterval(checkPlayersScreen, 1000);
+if (SITE) setInterval(() => { checkPlayersScreen(); checkMapScreen(); }, 1000);
 if (!playerLink) restoreScreen();
 if (playerLink) showPlayers(); else connect();
 })();
