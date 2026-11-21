@@ -787,7 +787,7 @@ button.cb-pic { cursor: zoom-in; }
         </div>
         <div class="map-tools gutter" id="mapTools" role="toolbar" aria-label="Map tools">
           <div class="seg" role="group" aria-label="Tool">
-            <button type="button" data-mtool="move" aria-pressed="true" title="Drag to move, scroll or pinch to zoom. Tap a pin or text to edit it.">Move</button>
+            <button type="button" data-mtool="move" aria-pressed="true" title="Drag (or middle mouse button) to move, scroll or pinch to zoom. Tap a pin or text to edit it.">Move</button>
             <button type="button" data-mtool="pin" aria-pressed="false" title="Tap the map to drop a pin with a note">Pin</button>
             <button type="button" data-mtool="pen" aria-pressed="false" title="Draw lines">Pen</button>
             <button type="button" data-mtool="paint" aria-pressed="false" title="See-through brush to colour areas">Paint</button>
@@ -4714,14 +4714,18 @@ function makeViewer(stage, canvas) {
     const ns = Math.max(v.fitS * 0.5, Math.min(v.fitS * 12, v.s * f));
     v.x = cx - (cx - v.x) * ns / v.s; v.y = cy - (cy - v.y) * ns / v.s; v.s = ns; v.apply();
   };
+  // Mouse wheel zooms around the pointer; drag with the middle button (or Move tool) to pan.
   stage.addEventListener('wheel', e => {
     e.preventDefault();
     const p = local(e), dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
     v.zoomAt(p.x, p.y, Math.exp(-dy * 0.0015));
   }, { passive: false });
+  stage.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });  // no browser auto-scroll on middle click
   stage.addEventListener('pointerdown', e => {
     if (e.button > 1) return;
     try { stage.setPointerCapture(e.pointerId); } catch {}
+    // Middle mouse button: always drags the map, whatever tool is picked.
+    if (e.button === 1) { e.preventDefault(); const p = local(e); v.pts.set(e.pointerId, p); v.toolOn = false; v.drag = { x: p.x, y: p.y, x0: v.x, y0: v.y, moved: true }; return; }
     v.pts.set(e.pointerId, local(e));
     if (v.pts.size === 2) {
       if (v.tool && v.tool.cancel) v.tool.cancel();
