@@ -1429,6 +1429,15 @@ const state = {
 const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 // The same app also runs as a website (site.js sets window.SITE and talks to Firebase instead of claude.ai).
 const SITE = window.SITE || null;
+/* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
+   older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
+const APP_BUILD = '20261121-134723';
+function reloadIfOutdated(d) {
+  const b = d && d.build;
+  if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
+  try { if (sessionStorage.getItem('pb-reloaded-for') === b) return; sessionStorage.setItem('pb-reloaded-for', b); } catch { return; }
+  location.replace(location.pathname + '?v=' + encodeURIComponent(b) + location.hash);  // the ?v= skips the browser's cached copy
+}
 const imgSrc = id => SITE ? SITE.imgSrc(id) : '/_blob/' + id;
 const thumbSrc = m => imgSrc(isAssetId(m.thumb) ? m.thumb : m.image);  // small copy for lists
 /* Remove an uploaded picture only when no saved monster still uses it (duplicates share pictures). */
@@ -3511,7 +3520,7 @@ async function publishPlayers() {
     const before = state.enc.pubAt || 0;
     state.enc.pubAt = Date.now();
     const pub = publicEnc(); playersSentKey = JSON.stringify(pub);
-    const write = state.db.doc('public/current').set({ ...pub, at: Date.now() });
+    const write = state.db.doc('public/current').set({ ...pub, at: Date.now(), build: APP_BUILD });
     encChanged();
     try { await write; }
     catch { state.enc.pubAt = before; encChanged(); toast('Couldn’t update the players’ screen. It will try again on the next turn.'); }
@@ -3665,8 +3674,8 @@ function showPlayers() {
     // Website: follow the DM's live turn order. The sign-in button is for the DM (hidden on the #players link).
     $('#pvSignin').hidden = location.hash === '#players';
     renderPlayerView(null);
-    SITE.watchPlayers(d => renderPlayerView(d));
-    if (SITE.watchMap) SITE.watchMap(d => setPvMap(d && d.map));
+    SITE.watchPlayers(d => { reloadIfOutdated(d); renderPlayerView(d); });
+    if (SITE.watchMap) SITE.watchMap(d => { reloadIfOutdated(d); setPvMap(d && d.map); });
     return;
   }
   const pub = readPub();
@@ -4555,6 +4564,7 @@ function fogSvg(m, dm, id) {
     const c = o.r ? '#000' : '#fff';  // in the mask: black = clear (revealed), white = fog
     return o.k === 'rect' ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${c}"/>`
       : o.k === 'poly' ? `<polygon points="${pts(o.p)}" fill="${c}"/>`
+      : o.k !== 'line' ? ''  // a shape from a newer version: skip it rather than draw it wrong
       : `<polyline points="${pts(o.p)}" stroke="${c}" stroke-width="${o.s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
   }).join('');
   // Players: solid black. The DM: a see-through shade, so they can still read the map underneath.
@@ -5108,7 +5118,7 @@ function pushMapSoon(delay = 300) {
   if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
   clearTimeout(mapPushT);
   mapPushT = setTimeout(async () => {
-    try { await state.db.doc('public/map').set({ map: publicMap(), at: Date.now() }); }
+    try { await state.db.doc('public/map').set({ map: publicMap(), at: Date.now(), build: APP_BUILD }); }
     catch { toast('Couldn’t update the players’ map. Try Send again.'); }
   }, delay);
 }
