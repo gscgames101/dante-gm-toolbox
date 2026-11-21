@@ -814,8 +814,10 @@ button.cb-pic { cursor: zoom-in; }
               <span class="seg" role="group" aria-label="Fog tool">
                 <button type="button" data-mtool="reveal-rect" aria-pressed="false" title="Drag a box to reveal a room">Reveal ▭</button>
                 <button type="button" data-mtool="reveal-brush" aria-pressed="false" title="Paint to reveal (size: S/M/L)">Reveal ✎</button>
+                <button type="button" data-mtool="reveal-poly" aria-pressed="false" title="Click the corners of a room to reveal it">Reveal ⬠</button>
                 <button type="button" data-mtool="hide-rect" aria-pressed="false" title="Drag a box to cover an area again">Hide ▭</button>
                 <button type="button" data-mtool="hide-brush" aria-pressed="false" title="Paint to cover again (size: S/M/L)">Hide ✎</button>
+                <button type="button" data-mtool="hide-poly" aria-pressed="false" title="Click the corners of an area to cover it again">Hide ⬠</button>
               </span>
               <button type="button" class="btn small ghost" data-act="fog-reveal-all">Reveal all</button>
               <button type="button" class="btn small ghost" data-act="fog-hide-all">Hide all</button>
@@ -4155,7 +4157,7 @@ document.addEventListener('click', async ev => {
   // maps
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
-  if (t.dataset.mtool) { state.mapTool = t.dataset.mtool; renderMapWork(); return; }
+  if (t.dataset.mtool) { if (dmViewer) dmViewer.tool.cancelPoly(); state.mapTool = t.dataset.mtool; renderMapWork(); return; }
   if (t.dataset.msize) { state.mapSize = t.dataset.msize; renderMapWork(); return; }
   if (t.dataset.mvis) { state.mapVis = t.dataset.mvis; renderMapWork(); return; }
   if (t.dataset.mcolor) { state.mapColor = t.dataset.mcolor; $('#mapColorPick').value = t.dataset.mcolor; renderMapWork(); return; }
@@ -4542,7 +4544,8 @@ const cleanMarks = a => (Array.isArray(a) ? a : []).filter(k => k && k.id && ['p
 /* Fog of war. A map's fog starts as fully hidden; each step either reveals (r: 1) or hides again (r: 0) a box
    ({k: 'rect', x, y, w, h}) or a brush stroke ({k: 'line', s: width, p: [x, y, x, y, …]}), applied in order. */
 const cleanFog = f => f && typeof f === 'object'
-  ? { on: !!f.on, ops: (Array.isArray(f.ops) ? f.ops : []).filter(o => o && (o.k === 'rect' ? [o.x, o.y, o.w, o.h].every(Number.isFinite) : o.k === 'line' && Array.isArray(o.p) && o.p.length >= 2)) }
+  ? { on: !!f.on, ops: (Array.isArray(f.ops) ? f.ops : []).filter(o => o && (o.k === 'rect' ? [o.x, o.y, o.w, o.h].every(Number.isFinite)
+      : (o.k === 'line' && Array.isArray(o.p) && o.p.length >= 2) || (o.k === 'poly' && Array.isArray(o.p) && o.p.length >= 6))) }
   : null;
 function fogSvg(m, dm, id) {
   const f = m.fog; if (!f || !f.on) return '';
@@ -4551,6 +4554,7 @@ function fogSvg(m, dm, id) {
   const shapes = f.ops.map(o => {
     const c = o.r ? '#000' : '#fff';  // in the mask: black = clear (revealed), white = fog
     return o.k === 'rect' ? `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${c}"/>`
+      : o.k === 'poly' ? `<polygon points="${pts(o.p)}" fill="${c}"/>`
       : `<polyline points="${pts(o.p)}" stroke="${c}" stroke-width="${o.s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
   }).join('');
   // Players: solid black. The DM: a see-through shade, so they can still read the map underneath.
@@ -4564,6 +4568,12 @@ function isFogged(m, pt) {
   for (const o of f.ops) {
     let inside = false;
     if (o.k === 'rect') inside = pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h;
+    else if (o.k === 'poly') {  // even-odd ray test
+      for (let i = 0, j = o.p.length - 2; i < o.p.length; j = i, i += 2) {
+        const xi = o.p[i], yi = o.p[i + 1], xj = o.p[j], yj = o.p[j + 1];
+        if ((yi > pt.y) !== (yj > pt.y) && pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi) inside = !inside;
+      }
+    }
     else for (let i = 0; i + 1 < o.p.length && !inside; i += 2) {
       const ax = o.p[i], ay = o.p[i + 1], bx = o.p[i + 2] ?? ax, by = o.p[i + 3] ?? ay, dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
       const t = l ? Math.max(0, Math.min(1, ((pt.x - ax) * dx + (pt.y - ay) * dy) / l)) : 0;
@@ -4856,7 +4866,16 @@ function renderMapWork() {
   $('#fogTools').hidden = !fogOn;
   document.querySelectorAll('[data-mtool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mtool === state.mapTool)));
   $('#mapStage').classList.toggle('drawing', state.mapTool !== 'move');
-  if (!dmViewer) { dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => editMarkAt(pt); }
+  if (!dmViewer) {
+    dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => editMarkAt(pt);
+    // Polygon fog tool: a line follows the pointer; double-click or Enter closes the shape, Esc cancels it.
+    $('#mapStage').addEventListener('pointermove', e => { if (!e.buttons) dmViewer.tool.hover(e); });
+    $('#mapStage').addEventListener('dblclick', () => dmViewer.tool.finishPoly());
+    addEventListener('keydown', e => {
+      if (!$('#mapStage').offsetParent || (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]'))) return;
+      if (e.key === 'Enter') dmViewer.tool.finishPoly(); else if (e.key === 'Escape') dmViewer.tool.cancelPoly();
+    });
+  }
   loadMapInto(dmViewer, $('#mapImg'), $('#mapSvg'), m);
   drawDmMarks();
 }
@@ -4903,15 +4922,38 @@ function undoMarks() {
 }
 const newMarkId = () => Math.random().toString(36).slice(2, 10);
 function dmTool() {
-  let stroke = null, start = null, fogOp = null;
+  let stroke = null, start = null, fogOp = null, poly = null, hoverPt = null;
   const sizeK = () => ({ s: 1, m: 2, l: 4 })[state.mapSize];
   const isFogTool = t => /^(reveal|hide)-(rect|brush)$/.test(t);
+  const isPolyTool = t => /^(reveal|hide)-poly$/.test(t);
+  // Polygon: corners placed so far, a line to the pointer, and the shape's fog preview once it has 3 corners.
+  const drawPoly = () => {
+    const m = curMap(); if (!m || !poly) return;
+    const s = dmViewer.s, all = hoverPt ? [...poly.p, Math.round(hoverPt.x), Math.round(hoverPt.y)] : poly.p;
+    let pts = ''; for (let i = 0; i + 1 < all.length; i += 2) pts += (i ? ' ' : '') + all[i] + ',' + all[i + 1];
+    const dots = []; for (let i = 0; i + 1 < poly.p.length; i += 2) dots.push(`<circle cx="${poly.p[i]}" cy="${poly.p[i + 1]}" r="${(i ? 4 : 7) / s}" fill="${i ? '#fff' : '#e2463a'}" stroke="#000" stroke-width="${1.5 / s}"/>`);
+    const outline = `<polyline points="${pts}" fill="none" stroke="#fff" stroke-width="${2 / s}" stroke-dasharray="${6 / s} ${6 / s}"/>` + dots.join('');
+    drawDmMarks(outline, all.length >= 6 ? fogPreview(m, { r: poly.r, k: 'poly', p: all }) : null);
+  };
+  const finishPoly = () => {
+    if (!poly) return;
+    const p = poly.p, r = poly.r; poly = null; hoverPt = null;
+    if (p.length < 6) { drawDmMarks(); toast('A shape needs at least 3 corners.'); return; }
+    changeFog(f => ({ on: true, ops: [...f.ops, { r, k: 'poly', p }] }));
+  };
+  const cancelPoly = () => { if (poly) { poly = null; hoverPt = null; drawDmMarks(); } };
   const fogPreview = (m, op) => ({ on: true, ops: [...((m.fog && m.fog.ops) || []), op] });
   const rectOf = (a, b) => ({ x: Math.round(Math.min(a.x, b.x)), y: Math.round(Math.min(a.y, b.y)), w: Math.round(Math.abs(a.x - b.x)), h: Math.round(Math.abs(a.y - b.y)) });
   return {
+    finishPoly, cancelPoly,
+    hover(e) { if (!poly) return; hoverPt = dmViewer.toImage(e); drawPoly(); },
     down(e) {
       const m = curMap(); if (!m || !state.canWrite || state.mapTool === 'move') return false;
       const pt = dmViewer.toImage(e); start = pt;
+      if (isPolyTool(state.mapTool)) {
+        if (!m.fog || !m.fog.on) { toast('Turn fog on first.'); return false; }
+        return true;  // the corner is placed on release (a drag pans nothing and adds nothing)
+      }
       if (isFogTool(state.mapTool)) {
         if (!m.fog || !m.fog.on) { toast('Turn fog on first.'); return false; }
         const r = state.mapTool.startsWith('reveal') ? 1 : 0;
@@ -4956,6 +4998,18 @@ function dmTool() {
     up(e) {
       const m = curMap(); if (!m) return;
       const pt = dmViewer.toImage(e);
+      if (isPolyTool(state.mapTool)) {
+        const s = dmViewer.s;
+        if (Math.hypot(pt.x - start.x, pt.y - start.y) * s > 8) return;  // dragged, not a click
+        if (!poly) { poly = { r: state.mapTool.startsWith('reveal') ? 1 : 0, p: [] }; toast('Click each corner. Click the first point, double-click or press Enter to finish; Esc cancels.'); }
+        const p = poly.p;
+        // Clicking the first corner closes the shape; a click right on the last corner (a double-click) is ignored.
+        if (p.length >= 6 && Math.hypot(pt.x - p[0], pt.y - p[1]) * s < 12) { finishPoly(); return; }
+        if (p.length >= 2 && Math.hypot(pt.x - p[p.length - 2], pt.y - p[p.length - 1]) * s < 5) return;
+        p.push(Math.round(pt.x), Math.round(pt.y));
+        hoverPt = pt; drawPoly();
+        return;
+      }
       if (fogOp) {
         const op = fogOp; fogOp = null;
         if (op.k === 'rect') {
@@ -4980,7 +5034,7 @@ function dmTool() {
           s: Math.round(24 * mapBase(m) * sizeK()), t: '', n: '' }, true);
       }
     },
-    cancel() { stroke = null; fogOp = null; drawDmMarks(); }
+    cancel() { stroke = null; fogOp = null; if (poly) drawPoly(); else drawDmMarks(); }
   };
 }
 /* Tapping a pin or a text with the Move tool opens it for editing. */
