@@ -612,6 +612,7 @@ button.cb-pic { cursor: zoom-in; }
 .color-pick input { width: 44px; height: 44px; margin: -7px; border: 0; padding: 0; cursor: pointer; background: none; }
 .map-stage { position: relative; flex: 1; min-height: 260px; overflow: hidden; background: var(--sunk); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
 .map-stage.drawing { cursor: crosshair; }
+.map-stage.panning, .map-stage.panning.drawing { cursor: grab; }
 .map-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .map-canvas img, .map-canvas svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .map-canvas .dmonly { opacity: .55; }
@@ -787,7 +788,7 @@ button.cb-pic { cursor: zoom-in; }
         </div>
         <div class="map-tools gutter" id="mapTools" role="toolbar" aria-label="Map tools">
           <div class="seg" role="group" aria-label="Tool">
-            <button type="button" data-mtool="move" aria-pressed="true" title="Drag (or middle mouse button) to move, scroll or pinch to zoom. Tap a pin or text to edit it.">Move</button>
+            <button type="button" data-mtool="move" aria-pressed="true" title="Drag to move (with any tool: right or middle mouse button, or hold Space and drag). Scroll or pinch to zoom. Tap a pin or text to edit it.">Move</button>
             <button type="button" data-mtool="pin" aria-pressed="false" title="Tap the map to drop a pin with a note">Pin</button>
             <button type="button" data-mtool="pen" aria-pressed="false" title="Draw lines">Pen</button>
             <button type="button" data-mtool="paint" aria-pressed="false" title="See-through brush to colour areas">Paint</button>
@@ -4721,11 +4722,19 @@ function makeViewer(stage, canvas) {
     v.zoomAt(p.x, p.y, Math.exp(-dy * 0.0015));
   }, { passive: false });
   stage.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });  // no browser auto-scroll on middle click
+  stage.addEventListener('contextmenu', e => e.preventDefault());  // right button drags the map instead
+  // Hold Space to pan with the left button, whatever tool is picked.
+  addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.repeat || !stage.offsetParent || (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]'))) return;
+    e.preventDefault(); v.space = true; stage.classList.add('panning');
+  });
+  addEventListener('keyup', e => { if (e.code === 'Space') { v.space = false; stage.classList.remove('panning'); } });
+  addEventListener('blur', () => { v.space = false; stage.classList.remove('panning'); });
   stage.addEventListener('pointerdown', e => {
-    if (e.button > 1) return;
+    if (e.button > 2) return;
     try { stage.setPointerCapture(e.pointerId); } catch {}
-    // Middle mouse button: always drags the map, whatever tool is picked.
-    if (e.button === 1) { e.preventDefault(); const p = local(e); v.pts.set(e.pointerId, p); v.toolOn = false; v.drag = { x: p.x, y: p.y, x0: v.x, y0: v.y, moved: true }; return; }
+    // Middle or right mouse button, or Space + left button: always drags the map, whatever tool is picked.
+    if (e.button === 1 || e.button === 2 || (v.space && e.pointerType === 'mouse')) { e.preventDefault(); const p = local(e); v.pts.set(e.pointerId, p); v.toolOn = false; v.drag = { x: p.x, y: p.y, x0: v.x, y0: v.y, moved: true }; return; }
     v.pts.set(e.pointerId, local(e));
     if (v.pts.size === 2) {
       if (v.tool && v.tool.cancel) v.tool.cancel();
