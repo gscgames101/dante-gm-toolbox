@@ -1544,7 +1544,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-134716';
+const APP_BUILD = '20261123-135628';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -4888,7 +4888,8 @@ function makeViewer(stage, canvas) {
   v.showTip = (x, y, text) => { if (!v.tip || !text) return; v.tipAt = { x, y }; v.tip.textContent = text; v.tip.style.left = (v.x + x * v.s) + 'px'; v.tip.style.top = (v.y + y * v.s) + 'px'; v.tip.hidden = false; };
   v.hideTip = () => { if (v.tip) v.tip.hidden = true; };
   stage.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !e.buttons && v.onHover) v.onHover(v.toImage(e)); });
-  stage.addEventListener('pointerleave', () => v.hideTip());
+  // only a mouse leaving hides it: on touch screens every tap ends with a "leave"
+  stage.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') v.hideTip(); });
   // What part of the map is on screen: centre and size, in map pixels (sent to players by "Sync view").
   v.getView = () => { const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return v.lastView || null;  // hidden: keep the last one
     return v.lastView = { cx: Math.round((r.width / 2 - v.x) / v.s), cy: Math.round((r.height / 2 - v.y) / v.s), vw: Math.round(r.width / v.s), vh: Math.round(r.height / v.s) }; };
@@ -4953,7 +4954,7 @@ function makeViewer(stage, canvas) {
     if (v.toolOn) { v.tool.move && v.tool.move(e); return; }
     if (v.drag) {
       const p = local(e), dx = p.x - v.drag.x, dy = p.y - v.drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 4) v.drag.moved = true;
+      if (Math.abs(dx) + Math.abs(dy) > (e.pointerType === 'mouse' ? 4 : 12)) v.drag.moved = true;  // fingers wobble a bit on a tap
       if (v.drag.moved) { v.x = v.drag.x0 + dx; v.y = v.drag.y0 + dy; v.apply(); }
     }
   });
