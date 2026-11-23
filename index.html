@@ -484,7 +484,9 @@ button.pv-thumb:hover { border-color: var(--accent); }
 /* Heroes tab: the player-character registry (groups shelf like the bestiary's books) */
 .app[data-tab="heroes"] .panes, .app[data-tab="heroes"] .initview, .app[data-tab="heroes"] .mapsview, .app[data-tab="heroes"] #newBtn { display: none; }
 .app:not([data-tab="heroes"]) .heroesview { display: none; }
-.heroesview { flex: 1; min-height: 0; padding-bottom: 32px; }
+.heroesview { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.heroesview > .list-tools { flex: none; position: static; }
+#heroScroll { padding-bottom: 32px; }
 .hero-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .hero-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: left; box-shadow: inset 6px 0 0 var(--side-pc); }
 .hero-row:hover { border-color: var(--muted); }
@@ -974,8 +976,10 @@ button.cb-pic { cursor: zoom-in; }
         <button type="button" class="btn primary" data-act="hero-new">+ New hero</button>
       </div>
     </div>
-    <ul class="hero-list" id="heroList"></ul>
-    <div class="empty" id="heroEmpty" hidden></div>
+    <div class="list-scroll" id="heroScroll">
+      <ul class="hero-list" id="heroList"></ul>
+      <div class="empty" id="heroEmpty" hidden></div>
+    </div>
   </main>
 
   <main class="pane gutter tokensview" id="tokensView" aria-label="Tokens">
@@ -1733,7 +1737,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-203613';
+const APP_BUILD = '20261123-204336';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
