@@ -431,6 +431,21 @@ button.pv-thumb:hover { border-color: var(--accent); }
 /* Tabs + initiative tracker */
 .app[data-tab="init"] .panes, .app[data-tab="init"] #newBtn { display: none; }
 .app[data-tab="bestiary"] .initview { display: none; }
+/* Heroes tab: the player-character registry (groups shelf like the bestiary's books) */
+.app[data-tab="heroes"] .panes, .app[data-tab="heroes"] .initview, .app[data-tab="heroes"] .mapsview, .app[data-tab="heroes"] #newBtn { display: none; }
+.app:not([data-tab="heroes"]) .heroesview { display: none; }
+.heroesview { flex: 1; min-height: 0; padding-bottom: 32px; }
+.hero-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hero-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: left; box-shadow: inset 6px 0 0 var(--side-pc); }
+.hero-row:hover { border-color: var(--muted); }
+.avatar.big { width: 48px; height: 48px; font-size: 1.3rem; }
+.avatar.big img { width: 100%; height: 100%; object-fit: cover; }
+.hero-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.hero-txt b { font-size: 1.05rem; overflow-wrap: anywhere; }
+.hero-txt span { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.hero-tok .tok-av { width: 40px; height: 40px; font-size: 1rem; border-width: 3px; }
+.hero-prev { border-color: var(--side-pc); }
+.hero-groups .chip { border-left: 4px solid var(--book, var(--line)); }
 /* Tokens tab */
 .app[data-tab="tokens"] .panes, .app[data-tab="tokens"] .initview, .app[data-tab="tokens"] .mapsview, .app[data-tab="tokens"] #newBtn { display: none; }
 .app:not([data-tab="tokens"]) .tokensview { display: none; }
@@ -466,7 +481,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .tok-bar-nm { font-weight: 700; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tok-size { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); }
 .tok-size input { width: 140px; accent-color: var(--accent); }
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--bg); }
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); background: var(--bg); }
 .tabs button { min-height: 46px; border: 0; background: transparent; font-weight: 700; color: var(--muted); border-top: 3px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .tabs button[aria-pressed="true"] { color: var(--accent); border-top-color: var(--accent); }
 .tab-badge { font-family: var(--mono); font-size: .72rem; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
@@ -713,7 +728,7 @@ button.cb-pic { cursor: zoom-in; }
   .initview { grid-template-columns: clamp(380px, 32vw, 680px) 1fr; }
   .detail-wrap { max-width: 1240px; }
   .detail-wrap .sb, .detail-wrap .notes, .cb-card { max-width: none; }
-  .tabs { grid-template-columns: repeat(4, minmax(0, 260px)); justify-content: center; }
+  .tabs { grid-template-columns: repeat(5, minmax(0, 220px)); justify-content: center; }
   .sheet-in { max-width: 960px; }
   /* Players' screen: no rolls yet = one centred column; with rolls = turn order on the left,
      latest + earlier rolls stacked on the right ("dense" lets the list fill the left beside them). */
@@ -892,6 +907,19 @@ button.cb-pic { cursor: zoom-in; }
     </section>
   </main>
 
+  <main class="pane gutter heroesview" id="heroesView" aria-label="Heroes">
+    <div class="list-tools">
+      <div class="shelf" id="heroShelf" role="group" aria-label="Groups"></div>
+      <div class="book-bar" id="heroGroupBar" hidden></div>
+      <div class="search">
+        <input id="heroQ" type="search" placeholder="Search heroes…" aria-label="Search heroes" autocomplete="off">
+        <button type="button" class="btn primary" data-act="hero-new">+ New hero</button>
+      </div>
+    </div>
+    <ul class="hero-list" id="heroList"></ul>
+    <div class="empty" id="heroEmpty" hidden></div>
+  </main>
+
   <main class="pane gutter tokensview" id="tokensView" aria-label="Tokens">
     <div class="tok-head">
       <h2>Tokens</h2>
@@ -956,6 +984,7 @@ button.cb-pic { cursor: zoom-in; }
     <button data-tab-go="init" aria-pressed="false">Initiative <span class="tab-badge" id="encBadge" hidden></span></button>
     <button data-tab-go="maps" aria-pressed="false">Maps <span class="tab-badge" id="mapBadge" hidden>LIVE</span></button>
     <button data-tab-go="tokens" aria-pressed="false">Tokens</button>
+    <button data-tab-go="heroes" aria-pressed="false">Heroes</button>
   </nav>
 
   <footer class="tray gutter" id="tray">
@@ -1286,6 +1315,52 @@ button.cb-pic { cursor: zoom-in; }
   </div>
 </div>
 
+<div class="sheet dim" id="heroSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box tok-dlg" id="heroForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h" id="heroDlgTitle">New hero</h3>
+      <div class="tok-dlg-row">
+        <div class="tok-prev hero-prev" id="heroPrev"></div>
+        <div class="tok-dlg-btns">
+          <label class="btn small file-btn" for="heroFile"><span id="heroPick">Choose picture</span><input id="heroFile" type="file" accept="image/*"></label>
+          <button type="button" class="btn small ghost" data-act="hero-paste">Paste</button>
+          <button type="button" class="btn small ghost danger" data-act="hero-pic-remove" id="heroPicRemove" hidden>Remove picture</button>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field"><label for="heroName">Name</label><input id="heroName" maxlength="40" placeholder="e.g. Aria"></div>
+        <div class="field"><label for="heroAc">AC</label><input id="heroAc" type="text" maxlength="8" placeholder="e.g. 16 or 16/18"></div>
+      </div>
+      <div class="field"><label for="heroTok">Token</label><select id="heroTok"></select><span class="hint">Make tokens in the Tokens tab. When this hero joins a fight, the token is linked to them there.</span></div>
+      <div class="field"><span class="lbl">Groups</span><div class="chips hero-groups" id="heroGroups"></div></div>
+      <p class="err" id="heroErr" hidden></p>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="hero-delete" id="heroDel" hidden>Delete</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="hero-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sheet dim" id="hgSheet" hidden>
+  <div class="gutter">
+    <form class="confirm-box" id="hgForm" autocomplete="off" novalidate>
+      <h3 class="dlg-h" id="hgDlgTitle">New group</h3>
+      <div class="field"><label for="hgName">Group name</label><input id="hgName" maxlength="40" placeholder="e.g. Curse of Strahd party"></div>
+      <div class="field"><span class="lbl">Colour</span><div class="swatches" id="hgColors" role="radiogroup" aria-label="Group colour"></div></div>
+      <p class="err" id="hgErr" hidden></p>
+      <div class="row-end">
+        <button type="button" class="btn ghost danger" data-act="hg-delete" id="hgDel" hidden>Delete group</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" data-act="hg-cancel">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="sheet dim" id="tokSheet" hidden>
   <div class="gutter">
     <form class="confirm-box tok-dlg" id="tokForm" autocomplete="off" novalidate>
@@ -1544,7 +1619,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-135839';
+const APP_BUILD = '20261123-141003';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3188,15 +3263,16 @@ async function exportForSite() {
     state.groups.forEach(g => (g.players || []).forEach(p => { add(p.image); add(p.thumb); }));
     state.maps.forEach(m => { add(m.image); add(m.thumb); });
     state.tokens.forEach(t => { add(t.image); add(t.thumb); });
+    state.heroes.forEach(h => { add(h.image); add(h.thumb); });
     const assets = {}; let i = 0, missing = 0;
     for (const id of ids) {
       siteMsg('#siteExportMsg', `Packing pictures… ${++i} of ${ids.size}`);
       try { assets[id] = await picData(id); } catch { missing++; }
     }
-    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, tokens: state.tokens, assets };
+    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, tokens: state.tokens, heroes: state.heroes, assets };
     const json = JSON.stringify(data);
     const name = `dante-gm-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
-    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${state.tokens.length} tokens, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
+    const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${state.tokens.length} tokens, ${state.heroes.length} heroes, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
     if (SITE) {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' })); a.download = name;
@@ -3238,10 +3314,11 @@ async function importFile(file) {
   const monsters = data.monsters.filter(m => m && m.id && m.name), books = (data.books || []).filter(b => b && b.id && b.name), groups = (data.groups || []).filter(g => g && g.id);
   const mapFolders = (data.mapFolders || []).filter(f => f && f.id && f.name), maps = (data.maps || []).filter(m => m && m.id && isAssetId(m.image));
   const tokens = (data.tokens || []).filter(t => t && t.id && t.name);
+  const heroes = (data.heroes || []).filter(h => h && h.id && h.name);
   const assets = Object.entries(data.assets || {}).filter(([id, d]) => isAssetId(id) && typeof d === 'string' && d.startsWith('data:image/'));
   const what = `${monsters.length} monsters, ${books.length} books, ${groups.length} groups, ${maps.length} maps and ${assets.length} pictures`;
-  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps, tokens));
-  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps, tokens));
+  if (SITE) showConfirm(`Replace the website’s bestiary with this file? ${what}. Your current fight stays.`, 'Replace', () => replaceFromFile(monsters, books, groups, assets, mapFolders, maps, tokens, heroes));
+  else showConfirm(`Import this file? ${what}. Ones you already have are updated; nothing is deleted.`, 'Import', () => mergeFromFile(monsters, books, groups, assets, mapFolders, maps, tokens, heroes));
 }
 /* ---------- 5etools files ----------
    5etools stores monsters as structured data with its own {@tag ...} markup in the text. This turns each one
@@ -3470,7 +3547,7 @@ async function addMonsterList(list) {
 }
 /* claude.ai app: add and update from the file, never delete. Pictures the app already has are reused;
    the rest are uploaded and the monsters point at the new copies. */
-async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = []) {
+async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = [], heroes = []) {
   const db = state.db, input = $('#siteImportFile'); input.disabled = true;
   try {
     const map = {}; let i = 0;
@@ -3485,13 +3562,14 @@ async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], m
     const fix = v => (isAssetId(v) && v in map) ? map[v] : v;
     const jobs = [
       ...books.map(({ id, ...b }) => () => db.collection('books').doc(id).set({ name: b.name, color: b.color, createdAt: b.createdAt || Date.now() })),
-      ...groups.map(({ id, ...g }) => () => db.collection('groups').doc(id).set({ name: g.name, createdAt: g.createdAt || Date.now(),
+      ...groups.map(({ id, ...g }) => () => db.collection('groups').doc(id).set({ name: g.name, color: g.color || 'navy', createdAt: g.createdAt || Date.now(),
         players: cleanPlayers((g.players || []).map(p => ({ ...p, image: fix(p.image), thumb: fix(p.thumb) }))) })),
       ...monsters.map(({ id, ...m }) => () => db.collection('monsters').doc(id).set(normalize({ ...m, image: fix(m.image), thumb: fix(m.thumb) }))),
       ...mapFolders.map(({ id, ...f }) => () => db.collection('mapFolders').doc(id).set({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() })),
       ...maps.filter(m => fix(m.image)).map(({ id, ...m }) => () => db.collection('maps').doc(id).set({
         name: str(m.name) || 'Map', folderId: m.folderId || null, image: fix(m.image), thumb: fix(m.thumb) || '',
         w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), tokens: cleanToks(m.tokens), createdAt: m.createdAt || Date.now() })),
+      ...heroes.map(h => () => { const { id, ...rest } = cleanHero({ ...h, image: fix(h.image), thumb: fix(h.thumb) }); return db.collection('heroes').doc(h.id).set(rest); }),
       ...tokens.map(t => () => { const c = cleanTokLib({ ...t, image: fix(t.image), thumb: fix(t.thumb) }); const { id, ...rest } = c; return db.collection('tokens').doc(t.id).set(rest); })
     ];
     let done = 0; const total = jobs.length;
@@ -3504,7 +3582,7 @@ async function mergeFromFile(monsters, books, groups, assets, mapFolders = [], m
   } finally { input.disabled = false; }
 }
 /* Website: make it match the file exactly (it's a copy of the claude.ai app). */
-function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = []) {
+function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps = [], tokens = [], heroes = []) {
   return (async () => {
     const db = state.db, input = $('#siteImportFile'); input.disabled = true;
     try {
@@ -3525,12 +3603,13 @@ function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps 
         have.filter(x => !keep.has(x.id)).forEach(x => ops.push(b => b.delete(db.collection(col).doc(x.id))));
       };
       mirror('books', books, state.books, ({ id, ...b }) => b);
-      mirror('groups', groups, state.groups, ({ id, ...g }) => ({ name: g.name, players: cleanPlayers(g.players), createdAt: g.createdAt || Date.now() }));
+      mirror('groups', groups, state.groups, ({ id, ...g }) => ({ name: g.name, color: g.color || 'navy', players: cleanPlayers(g.players), createdAt: g.createdAt || Date.now() }));
       mirror('monsters', monsters, state.monsters, ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
       mirror('mapFolders', mapFolders, state.mapFolders, ({ id, ...f }) => ({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() }));
       mirror('maps', maps, state.maps, ({ id, ...m }) => ({ name: str(m.name) || 'Map', folderId: m.folderId || null, image: m.image, thumb: m.thumb || '',
         w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), tokens: cleanToks(m.tokens), createdAt: m.createdAt || Date.now() }));
       mirror('tokens', tokens, state.tokens, t => { const { id, ...rest } = cleanTokLib(t); return rest; });
+      mirror('heroes', heroes, state.heroes, h => { const { id, ...rest } = cleanHero(h); return rest; });
       for (let i = 0; i < ops.length; i += 100) {  // map documents can be large, so smaller batches
         const b = db.batch(); ops.slice(i, i + 100).forEach(f => f(b)); await b.commit();
       }
@@ -4067,6 +4146,7 @@ function setTab(tab) {
   ls.set('pb-tab', tab);
   if (tab === 'init') renderEncounter();
   if (tab === 'tokens') renderTokens();
+  if (tab === 'heroes') renderHeroes();
   if (tab === 'maps') { renderMaps(); requestAnimationFrame(() => dmViewer && curMap() && dmViewer.fit()); }
 }
 function showConfirm(msg, yesLabel, fn) {
@@ -4102,15 +4182,16 @@ function grpView(v) {
 }
 function renderGroups() {
   const gs = [...state.groups].sort((a, b) => a.name.localeCompare(b.name));
-  $('#grpCards').innerHTML = gs.length ? gs.map(g => `<div class="grp-card">
-      <div class="grp-card-top"><b>${esc(g.name)}</b><span>${g.players.length} player${g.players.length === 1 ? '' : 's'}</span></div>
-      <div class="avatars">${g.players.map(avatarHtml).join('')}</div>
+  // groups and their heroes come from the Heroes tab
+  $('#grpCards').innerHTML = gs.length ? gs.map(g => { const hs = heroesIn(g.id); return `<div class="grp-card">
+      <div class="grp-card-top"><b>${esc(g.name)}</b><span>${hs.length} hero${hs.length === 1 ? '' : 'es'}</span></div>
+      <div class="avatars">${hs.map(avatarHtml).join('')}</div>
       <div class="grp-card-acts">
         <button type="button" class="btn primary small" data-grp-add="${esc(g.id)}">Add to fight</button>
         ${state.canWrite ? `<button type="button" class="btn small" data-grp-edit="${esc(g.id)}">Edit</button>` : ''}
       </div>
-    </div>`).join('')
-    : `<div class="empty" style="padding:8px 0 4px"><h3>No groups yet</h3><p>Make a group for your party once, with everyone's name and picture. Then add the whole group to any fight with one tap.</p></div>`;
+    </div>`; }).join('')
+    : `<div class="empty" style="padding:8px 0 4px"><h3>No groups yet</h3><p>Groups now live in the <b>Heroes</b> tab: log your player characters there and sort them into groups. Then add a whole group to any fight with one tap.</p></div>`;
 }
 function openGroups() { renderGroups(); grpView('list'); $('#grpSheet').hidden = false; }
 function editGroup(g) {
@@ -4184,6 +4265,7 @@ function assetUsed(id) {
   return state.monsters.some(m => m.image === id || m.thumb === id)
     || state.groups.some(g => g.players.some(p => p.image === id || p.thumb === id))
     || state.enc.list.some(c => c.img === id || c.thumb === id)
+    || state.heroes.some(h => h.image === id || h.thumb === id) || state.heroEd && (state.heroEd.image === id || state.heroEd.thumb === id)
     || state.tokens.some(t => t.image === id || t.thumb === id) || state.tokEd && (state.tokEd.image === id || state.tokEd.thumb === id);
 }
 async function dropUnused(id) { if (!isAssetId(id) || !state.assets || assetUsed(id)) return; try { await state.assets.delete(id); } catch {} }
@@ -4228,9 +4310,11 @@ async function deleteGroup(id) {
 }
 function startGroupInit(gid) {
   const g = state.groups.find(x => x.id === gid); if (!g) return;
+  const players = heroesIn(gid);
+  if (!players.length) { toast('That group has no heroes yet. Add some in the Heroes tab.'); return; }
   state.grpInitFor = gid;
   const inFight = new Set(state.enc.list.filter(c => c.kind === 'pc').map(c => c.name.toLowerCase()));
-  $('#grpInitRows').innerHTML = g.players.map(p => {
+  $('#grpInitRows').innerHTML = players.map(p => {
     const dup = inFight.has(p.name.toLowerCase());
     return `<div class="irow">${avatarHtml(p)}<span class="nm">${esc(p.name)}${dup ? '<span class="note">Already in the fight, skipped</span>' : ''}</span>
       <input id="gi-${esc(p.id)}" type="number" placeholder="Init" aria-label="Initiative for ${esc(p.name)}"${dup ? ' disabled' : ''}></div>`;
@@ -4242,15 +4326,21 @@ function addGroupToFight(e) {
   e.preventDefault();
   const g = state.groups.find(x => x.id === state.grpInitFor); if (!g) return;
   let added = 0, blanks = 0;
-  g.players.forEach(p => {
+  const links = [];  // [token, combatant id], saved once the fight itself is saved
+  heroesIn(g.id).forEach(p => {
     const inp = document.getElementById('gi-' + p.id);
     if (!inp || inp.disabled) return;
     const v = intOrNull(inp.value); if (v == null) blanks++;
-    state.enc.list.push({ id: uid(), kind: 'pc', name: p.name, init: v == null ? 0 : v, tie: 0, order: Date.now() + encOrder++, ac: acOrNull(p.ac),
+    const cid = uid();
+    state.enc.list.push({ id: cid, kind: 'pc', name: p.name, init: v == null ? 0 : v, tie: 0, order: Date.now() + encOrder++, ac: acOrNull(p.ac), heroId: p.id,
       img: isAssetId(p.image) ? p.image : '', thumb: isAssetId(p.image) && isAssetId(p.thumb) ? p.thumb : '' });
+    // the hero's token now points at them in this fight (it glows on their turn, on the map)
+    const tk = p.tokenId && tokLib(p.tokenId);
+    if (tk) links.push([tk, cid]);
     added++;
   });
   if (added) encChanged();
+  links.forEach(([tk, cid]) => { tk.link = cid; if (state.db) state.db.collection('tokens').doc(tk.id).update({ link: cid }).catch(() => {}); });
   $('#grpSheet').hidden = true;
   toast(!added ? 'Everyone in that group is already in the fight.'
     : `Added ${added} player${added === 1 ? '' : 's'}` + (blanks ? `. Tap the 0s to set ${blanks === 1 ? 'the missing initiative' : 'missing initiatives'}.` : ''));
@@ -4310,6 +4400,10 @@ document.addEventListener('click', async ev => {
   // maps
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
+  if (t.dataset.hgroup) { state.heroGroup = t.dataset.hgroup; ls.set('pb-hgroup', state.heroGroup); renderHeroes(); return; }
+  if (t.dataset.heroedit) { openHeroDlg(state.heroes.find(h => h.id === t.dataset.heroedit)); return; }
+  if (t.dataset.herogrp && state.heroEd) { const g = t.dataset.herogrp, ids = state.heroEd.groupIds; state.heroEd.groupIds = ids.includes(g) ? ids.filter(x => x !== g) : [...ids, g]; renderHeroDlg(); return; }
+  if (t.dataset.hgcolor && state.hgEd) { state.hgEd.color = t.dataset.hgcolor; $('#hgColors').innerHTML = colorSwatches(state.hgEd.color, 'data-hgcolor'); return; }
   if (t.dataset.tokedit) { openTokDlg(tokLib(t.dataset.tokedit)); return; }
   if (t.dataset.tokpick) { placeToken(t.dataset.tokpick); return; }
   if (t.dataset.tokrim && state.tokEd) { state.tokEd.rim = t.dataset.tokrim; renderTokDlg(); return; }
@@ -4339,7 +4433,7 @@ document.addEventListener('click', async ev => {
   if (t.dataset.cbDel) return removeFromFight(t.dataset.cbDel);
   // player groups
   if (t.dataset.grpAdd) return startGroupInit(t.dataset.grpAdd);
-  if (t.dataset.grpEdit) { const g = state.groups.find(x => x.id === t.dataset.grpEdit); if (g) editGroup(g); return; }
+  if (t.dataset.grpEdit) { $('#grpSheet').hidden = true; state.heroGroup = t.dataset.grpEdit; ls.set('pb-hgroup', state.heroGroup); setTab('heroes'); return; }  // groups are edited in the Heroes tab
   if (t.dataset.ppic) { if (t.closest('.prow') && !t.textContent.includes('…')) { state.grpPicFor = t.dataset.ppic; $('#grpFile').click(); } return; }
   if (t.dataset.prm) { readGrpNames(); state.grp.players = state.grp.players.filter(p => p.id !== t.dataset.prm); renderGrpPlayers(); return; }
   if (t.dataset.pcFill) { $('#pcName').value = t.dataset.pcFill; $('#pcInit').focus(); return; }
@@ -4405,6 +4499,15 @@ document.addEventListener('click', async ev => {
     case 'map-add-token': openTokPick(); break;
     case 'tok-pick-close': $('#tokPickSheet').hidden = true; break;
     case 'tok-remove': { const id = state.selTok; state.selTok = null; changeTokens(list => list.filter(x => x.id !== id)); break; }
+    case 'hero-new': openHeroDlg(null); break;
+    case 'hero-cancel': cancelHero(); break;
+    case 'hero-delete': deleteHero(); break;
+    case 'hero-paste': pasteHeroPic(); break;
+    case 'hero-pic-remove': if (state.heroEd) { state.heroEd.image = ''; state.heroEd.thumb = ''; renderHeroDlg(); } break;
+    case 'hg-new': openHgDlg(null); break;
+    case 'hg-edit': openHgDlg(state.groups.find(g => g.id === state.heroGroup)); break;
+    case 'hg-cancel': state.hgEd = null; $('#hgSheet').hidden = true; break;
+    case 'hg-delete': deleteHg(); break;
     case 'tok-new': openTokDlg(null); break;
     case 'tok-cancel': cancelTok(); break;
     case 'tok-delete': deleteTok(); break;
@@ -4464,7 +4567,7 @@ document.addEventListener('click', async ev => {
     }
     case 'grp-open': openGroups(); break;
     case 'grp-close': $('#grpSheet').hidden = true; break;
-    case 'grp-new': editGroup(null); break;
+    case 'grp-new': $('#grpSheet').hidden = true; setTab('heroes'); openHgDlg(null); break;  // groups are made in the Heroes tab
     case 'grp-back': if (state.grpViewName === 'edit') cancelGroupEdit(); else { renderGroups(); grpView('list'); } break;
     case 'grp-cancel': cancelGroupEdit(); break;
     case 'grp-add-player': {
@@ -5627,6 +5730,196 @@ function checkMapScreen() {
   if (k !== mapSentKey) { mapSentKey = k; pushMapSoon(150); }
 }
 
+/* ---------- heroes ----------
+   The player-character registry: heroes/<id> = {name, ac, image, thumb, tokenId, groupIds}. Groups are the
+   groups/<id> docs (now just {name, color}); a hero can be in several, like a monster in several books.
+   The Initiative tab's Groups list reads from here. */
+state.heroes = []; state.heroGroup = ls.get('pb-hgroup', 'all') || 'all'; state.heroEd = null; state.hgEd = null; state.heroQ = '';
+let heroesLoaded = false, groupsLoaded = false, migratingGroups = false;
+const cleanHero = d => ({ id: d.id, name: str(d.name).slice(0, 40) || 'Hero', ac: acOrNull(d.ac),
+  image: isAssetId(d.image) ? d.image : '', thumb: isAssetId(d.image) && isAssetId(d.thumb) ? d.thumb : '',
+  tokenId: typeof d.tokenId === 'string' ? d.tokenId.slice(0, 64) : '',
+  groupIds: [...new Set((Array.isArray(d.groupIds) ? d.groupIds : []).filter(x => typeof x === 'string'))], createdAt: num(d.createdAt, Date.now()) });
+const heroesIn = gid => state.heroes.filter(h => h.groupIds.includes(gid));
+const sortedGroups = () => [...state.groups].sort((a, b) => a.name.localeCompare(b.name));
+const heroAv = h => `<span class="avatar big">${isAssetId(h.image) ? `<img src="${imgSrc(h.thumb || h.image)}" alt="" loading="lazy" decoding="async">` : esc((h.name || '?')[0].toUpperCase())}</span>`;
+function renderHeroes() {
+  if (state.heroGroup !== 'all' && !state.groups.some(g => g.id === state.heroGroup)) state.heroGroup = 'all';
+  const tile = (id, name, count, style, cls) => `<button type="button" class="book${cls ? ' ' + cls : ''}" data-hgroup="${esc(id)}" aria-pressed="${state.heroGroup === id}"${style ? ` style="${style}"` : ''} aria-label="${esc(name)}, ${count} hero${count === 1 ? '' : 'es'}"><span class="book-title">${esc(name)}</span><span class="book-count">${count}</span></button>`;
+  $('#heroShelf').innerHTML = tile('all', 'All PCs', state.heroes.length, '', 'book-all')
+    + sortedGroups().map(g => tile(g.id, g.name, heroesIn(g.id).length, coverStyle(g.color))).join('')
+    + (state.canWrite ? `<button type="button" class="book book-new" data-act="hg-new">+ New group</button>` : '');
+  const g = state.groups.find(x => x.id === state.heroGroup), bar = $('#heroGroupBar');
+  bar.hidden = !g;
+  bar.innerHTML = g ? `<b>${esc(g.name)}</b><span>${heroesIn(g.id).length} heroes</span><span class="spacer"></span>${state.canWrite ? '<button type="button" class="btn small ghost" data-act="hg-edit">Edit group</button>' : ''}` : '';
+  const q = state.heroQ.toLowerCase();
+  const list = (g ? heroesIn(g.id) : state.heroes).filter(h => !q || h.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
+  $('#heroList').innerHTML = list.map(h => {
+    const t = h.tokenId && tokLib(h.tokenId), gs = h.groupIds.map(id => state.groups.find(x => x.id === id)).filter(Boolean);
+    return `<li><button type="button" class="hero-row" data-heroedit="${esc(h.id)}">${heroAv(h)}<span class="hero-txt"><b>${esc(h.name)}</b>`
+      + `<span>${h.ac ? 'AC ' + esc(h.ac) : 'No AC'}${gs.length ? ' · ' + gs.map(x => esc(x.name)).join(', ') : ''}</span></span>`
+      + (t ? `<span class="hero-tok" title="Token: ${esc(t.name)}">${tokAv(t)}</span>` : '') + '</button></li>';
+  }).join('');
+  const empty = $('#heroEmpty'); empty.hidden = list.length > 0;
+  empty.innerHTML = state.heroes.length ? '<p>No heroes here.</p>'
+    : '<h3>No heroes yet</h3><p>Tap <b>+ New hero</b> to log the player characters of your campaigns: name, AC, picture and their token. Sort them into groups like books.</p>';
+}
+/* --- hero editor --- */
+function openHeroDlg(h) {
+  if (!state.canWrite) return;
+  state.heroEd = h ? { ...h, groupIds: [...h.groupIds], uploaded: [] }
+    : { id: null, name: '', ac: null, image: '', thumb: '', tokenId: '', groupIds: state.heroGroup !== 'all' ? [state.heroGroup] : [], uploaded: [] };
+  $('#heroDlgTitle').textContent = h ? 'Edit hero' : 'New hero';
+  $('#heroName').value = state.heroEd.name; $('#heroAc').value = state.heroEd.ac || '';
+  $('#heroTok').innerHTML = '<option value="">No token</option>' + [...state.tokens].sort((a, b) => a.name.localeCompare(b.name)).map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+  $('#heroTok').value = state.heroEd.tokenId && tokLib(state.heroEd.tokenId) ? state.heroEd.tokenId : '';
+  $('#heroDel').hidden = !h; $('#heroErr').hidden = true;
+  renderHeroDlg(); $('#heroSheet').hidden = false; $('#heroName').focus();
+}
+function renderHeroDlg() {
+  const e = state.heroEd; if (!e) return;
+  $('#heroPrev').innerHTML = isAssetId(e.image) ? `<img src="${imgSrc(e.thumb || e.image)}" alt="">` : esc((str($('#heroName').value) || '?')[0].toUpperCase());
+  $('#heroPicRemove').hidden = !isAssetId(e.image);
+  $('#heroPick').textContent = e.uploading ? 'Uploading…' : isAssetId(e.image) ? 'Change picture' : 'Choose picture';
+  $('#heroGroups').innerHTML = sortedGroups().map(g => `<button type="button" class="chip" data-herogrp="${esc(g.id)}" aria-pressed="${e.groupIds.includes(g.id)}" style="--book:${bookColor(g)}">${esc(g.name)}</button>`).join('')
+    || '<span class="hint">No groups yet. Make one with <b>+ New group</b> on the shelf.</span>';
+}
+async function heroUpload(file) {
+  const e = state.heroEd; if (!e || !file) return;
+  if (!state.assets) { showErr('#heroErr', 'Pictures can only be added by the toolbox owner.'); return; }
+  if (!file.type.startsWith('image/')) { showErr('#heroErr', 'That file isn’t a picture. Pick a JPG, PNG, WebP or GIF.'); return; }
+  e.uploading = true; renderHeroDlg();
+  try {
+    const blob = await prepareImage(file);
+    const res = await state.assets.upload(blob, blob.type ? undefined : { type: 'image/jpeg' });
+    e.uploaded.push(res.id);
+    let th = '';
+    try { const tb = await makeThumb(blob); if (tb) { const tr = await state.assets.upload(tb); e.uploaded.push(tr.id); th = tr.id; } } catch {}
+    e.image = res.id; e.thumb = th;
+  } catch (err) { showErr('#heroErr', err && err.code === 'too_large' ? 'That picture is too big (20 MB max).' : 'Couldn’t upload the picture. Check your connection and try again.'); }
+  e.uploading = false; renderHeroDlg();
+}
+async function pasteHeroPic() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) throw new Error('unsupported');
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find(t => t.startsWith('image/')); if (!type) continue;
+      return heroUpload(new File([await item.getType(type)], 'pasted.' + (type.split('/')[1] || 'png'), { type }));
+    }
+    showErr('#heroErr', 'There’s no picture on your clipboard. Copy an image first, then tap Paste.');
+  } catch { toast('Press Ctrl+V now to paste the picture.'); }
+}
+async function saveHero(ev) {
+  ev.preventDefault();
+  const e = state.heroEd; if (!e) return;
+  if (e.uploading) { showErr('#heroErr', 'Wait for the picture to finish uploading, then save.'); return; }
+  const name = str($('#heroName').value).slice(0, 40);
+  if (!name) { showErr('#heroErr', 'Give the hero a name.'); $('#heroName').focus(); return; }
+  if (!state.db) { showErr('#heroErr', 'Not connected, so the hero can’t be saved right now.'); return; }
+  const old = e.id ? state.heroes.find(h => h.id === e.id) : null;
+  const ref = old ? state.db.collection('heroes').doc(old.id) : state.db.collection('heroes').doc();
+  const data = { name, ac: acOrNull($('#heroAc').value), image: isAssetId(e.image) ? e.image : '', thumb: isAssetId(e.image) && isAssetId(e.thumb) ? e.thumb : '',
+    tokenId: $('#heroTok').value || '', groupIds: e.groupIds.filter(id => state.groups.some(g => g.id === id)), createdAt: old ? old.createdAt : Date.now() };
+  try {
+    await ref.set(data);
+    const keep = new Set([data.image, data.thumb]), drop = e.uploaded.filter(id => !keep.has(id));
+    if (old) [old.image, old.thumb].forEach(id => { if (isAssetId(id) && !keep.has(id)) drop.push(id); });
+    const rec = cleanHero({ ...data, id: ref.id }), i = state.heroes.findIndex(h => h.id === ref.id);
+    if (i >= 0) state.heroes[i] = rec; else state.heroes.push(rec);
+    state.heroEd = null; $('#heroSheet').hidden = true;
+    renderHeroes(); drop.forEach(dropUnused);
+    toast(old ? 'Hero saved' : `Added ${name}`);
+  } catch (err) { showErr('#heroErr', saveErrorText(err)); }
+}
+function cancelHero() { const e = state.heroEd; state.heroEd = null; $('#heroSheet').hidden = true; if (e) e.uploaded.forEach(dropUnused); }
+function deleteHero() {
+  const h = state.heroEd && state.heroes.find(x => x.id === state.heroEd.id); if (!h) return;
+  showConfirm(`Delete ${h.name} from your heroes? Fights they’re already in keep them.`, 'Delete', async () => {
+    try {
+      await state.db.collection('heroes').doc(h.id).delete();
+      state.heroes = state.heroes.filter(x => x.id !== h.id);
+      state.heroEd = null; $('#heroSheet').hidden = true;
+      [h.image, h.thumb].forEach(dropUnused); renderHeroes(); toast(`Deleted ${h.name}`);
+    } catch (err) { showErr('#heroErr', saveErrorText(err)); }
+  });
+}
+/* --- groups (the shelf) --- */
+function openHgDlg(g) {
+  if (!state.canWrite) return;
+  state.hgEd = g ? { id: g.id, name: g.name, color: g.color || 'navy' } : { id: null, name: '', color: Object.keys(BOOK_COLORS)[state.groups.length % 8] };
+  $('#hgDlgTitle').textContent = g ? 'Edit group' : 'New group';
+  $('#hgName').value = state.hgEd.name; $('#hgDel').hidden = !g; $('#hgErr').hidden = true;
+  $('#hgColors').innerHTML = colorSwatches(state.hgEd.color, 'data-hgcolor');
+  $('#hgSheet').hidden = false; $('#hgName').focus();
+}
+async function saveHg(ev) {
+  ev.preventDefault();
+  const e = state.hgEd; if (!e) return;
+  const name = str($('#hgName').value).slice(0, 40);
+  if (!name) { showErr('#hgErr', 'Give the group a name.'); $('#hgName').focus(); return; }
+  if (!state.db) { showErr('#hgErr', 'Not connected, so the group can’t be saved right now.'); return; }
+  const old = e.id ? state.groups.find(g => g.id === e.id) : null;
+  const ref = old ? state.db.collection('groups').doc(old.id) : state.db.collection('groups').doc();
+  const data = { name, color: e.color, players: [], createdAt: old ? old.createdAt || Date.now() : Date.now() };
+  try {
+    await ref.set(data);
+    state.groups = [...state.groups.filter(g => g.id !== ref.id), { ...data, id: ref.id }];
+    if (!old) { state.heroGroup = ref.id; ls.set('pb-hgroup', ref.id); }
+    state.hgEd = null; $('#hgSheet').hidden = true;
+    renderHeroes(); if (!$('#grpSheet').hidden) renderGroups();
+    toast(old ? 'Group saved' : `Created “${name}”`);
+  } catch (err) { showErr('#hgErr', saveErrorText(err)); }
+}
+function deleteHg() {
+  const g = state.hgEd && state.groups.find(x => x.id === state.hgEd.id); if (!g) return;
+  showConfirm(`Delete the group “${g.name}”? Its heroes stay in All PCs.`, 'Delete', async () => {
+    try {
+      await state.db.collection('groups').doc(g.id).delete();
+      state.groups = state.groups.filter(x => x.id !== g.id);
+      for (const h of heroesIn(g.id)) { h.groupIds = h.groupIds.filter(x => x !== g.id); try { await state.db.collection('heroes').doc(h.id).update({ groupIds: h.groupIds }); } catch {} }
+      state.hgEd = null; $('#hgSheet').hidden = true; state.heroGroup = 'all';
+      renderHeroes(); toast(`Deleted “${g.name}”`);
+    } catch (err) { showErr('#hgErr', saveErrorText(err)); }
+  });
+}
+/* Older player groups kept their players inside the group. Once both lists have loaded, each player becomes a hero
+   (one hero per name, in every group they were in) and the group keeps just its name and colour. */
+async function migrateGroupPlayers() {
+  if (!heroesLoaded || !groupsLoaded || migratingGroups || !state.canWrite || !state.db) return;
+  const old = state.groups.filter(g => g.players && g.players.length); if (!old.length) return;
+  migratingGroups = true;
+  try {
+    const byName = new Map(state.heroes.map(h => [h.name.toLowerCase(), h]));
+    for (const g of old) {
+      for (const p of g.players) {
+        let h = byName.get(p.name.toLowerCase());
+        if (h) {
+          if (!h.groupIds.includes(g.id)) { h.groupIds.push(g.id); await state.db.collection('heroes').doc(h.id).update({ groupIds: h.groupIds }); }
+        } else {
+          const ref = state.db.collection('heroes').doc();
+          const data = { name: p.name, ac: p.ac || null, image: p.image || '', thumb: p.thumb || '', tokenId: '', groupIds: [g.id], createdAt: Date.now() };
+          await ref.set(data);
+          h = cleanHero({ ...data, id: ref.id }); state.heroes.push(h); byName.set(p.name.toLowerCase(), h);
+        }
+      }
+      await state.db.collection('groups').doc(g.id).set({ name: g.name, color: g.color || 'navy', players: [], createdAt: g.createdAt || Date.now() });
+      g.players = [];
+    }
+    if ($('#app').dataset.tab === 'heroes') renderHeroes();
+    toast('Your player groups are now in the Heroes tab.');
+  } catch { /* tries again next time the app opens */ } finally { migratingGroups = false; }
+}
+$('#heroForm').addEventListener('submit', saveHero);
+$('#hgForm').addEventListener('submit', saveHg);
+$('#heroFile').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; heroUpload(f); });
+$('#heroName').addEventListener('input', renderHeroDlg);
+$('#heroQ').addEventListener('input', e => { state.heroQ = e.target.value; renderHeroes(); });
+document.addEventListener('paste', e => {
+  if ($('#heroSheet').hidden || !state.heroEd) return;
+  const f = [...(e.clipboardData ? e.clipboardData.files : [])].find(f => f.type.startsWith('image/'));
+  if (f) { e.preventDefault(); heroUpload(f); }
+});
+
 /* ---------- full screen ---------- */
 // Hidden where the browser can't do it (iPhone Safari, or inside a frame that doesn't allow it).
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
@@ -5689,9 +5982,17 @@ async function connect() {
   setSync('Syncing…', 'idle');
   encSubscribe(db);
   db.collection('groups').onSnapshot(snap => {
-    state.groups = snap.docs.map(d => { const g = d.data(); return { id: d.id, name: str(g.name) || 'Group', players: cleanPlayers(g.players), createdAt: g.createdAt }; });
+    state.groups = snap.docs.map(d => { const g = d.data(); return { id: d.id, name: str(g.name) || 'Group', color: BOOK_COLORS[g.color] ? g.color : 'navy', players: cleanPlayers(g.players), createdAt: g.createdAt }; });
     ls.set('pb-groups', state.groups);
     if (!$('#grpSheet').hidden && state.grpViewName === 'list') renderGroups();
+    if ($('#app').dataset.tab === 'heroes') renderHeroes();
+    groupsLoaded = true; migrateGroupPlayers();
+  }, () => {});
+  db.collection('heroes').onSnapshot(snap => {
+    state.heroes = snap.docs.map(d => cleanHero({ ...d.data(), id: d.id }));
+    if ($('#app').dataset.tab === 'heroes') renderHeroes();
+    if (!$('#grpSheet').hidden && state.grpViewName === 'list') renderGroups();
+    heroesLoaded = true; migrateGroupPlayers();
   }, () => {});
   db.collection('books').onSnapshot(snap => {
     state.books = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(b => b.name);
@@ -5705,7 +6006,7 @@ async function connect() {
   db.collection('tokens').onSnapshot(snap => {
     state.tokens = snap.docs.map(d => cleanTokLib({ ...d.data(), id: d.id }));
     const tab = $('#app').dataset.tab;
-    if (tab === 'tokens') renderTokens(); else if (tab === 'maps') renderMapWork();
+    if (tab === 'tokens') renderTokens(); else if (tab === 'maps') renderMapWork(); else if (tab === 'heroes') renderHeroes();
   }, () => {});
   db.collection('maps').onSnapshot(snap => {
     const local = state.maps.find(m => m.id === mapDirtyId);  // keep marks that are still waiting to save
@@ -5751,7 +6052,7 @@ state.groups = (ls.get('pb-groups', []) || []).filter(g => g && g.id).map(g => (
 state.book = ls.get('pb-book', 'all') || 'all';
 renderList(); renderDetail(); renderTray();
 state.shownMap = ls.get('pb-shown-map', null);
-setTab(['init', 'maps', 'tokens'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
+setTab(['init', 'maps', 'tokens', 'heroes'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
 setupFullscreen();
 if (SITE) setInterval(() => { checkPlayersScreen(); checkMapScreen(); }, 1000);
