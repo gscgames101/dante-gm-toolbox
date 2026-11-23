@@ -376,6 +376,17 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .pv-table.on b { color: var(--good); }
 .cb-player { font-size: .8rem; color: var(--muted); margin-left: 8px; }
 .cb-player.on { color: var(--good); }
+/* Website Players panel: wide and two columns on bigger screens, centred, no page scroll */
+#pvSheet:not([hidden]) { display: grid; place-items: center; }
+#pvSheet > .gutter { width: 100%; padding-block: 16px; }
+#pvSheet .confirm-box { margin: 0 auto; }
+.pv-dlg.site { max-width: 880px; }
+.pv-gcols { display: grid; gap: 14px 22px; }
+@media (min-width: 760px) { .pv-gcols { grid-template-columns: 1fr 1fr; align-items: start; } }
+.pv-gcol { display: grid; gap: 12px; min-width: 0; }
+.pv-gcol .seat-list { max-height: min(46vh, 380px); overflow-y: auto; overscroll-behavior: contain; }
+.pv-gcol .seat-list li { padding: 4px 8px; gap: 8px; }
+.pv-gcol .seat-txt { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 /* Roles: "boot" until we know who is viewing, "player" for shared viewers (or the DM's preview), "dm" for the owner. */
 .player-view, .boot { display: none; }
 .app[data-role="boot"] main, .app[data-role="boot"] .tabs, .app[data-role="boot"] #newBtn, .app[data-role="boot"] .tray { display: none; }
@@ -1349,7 +1360,7 @@ button.cb-pic { cursor: zoom-in; }
   <div class="gutter">
     <div class="confirm-box pv-dlg" role="dialog" aria-modal="true" aria-labelledby="pvDlgTitle">
       <h3 class="dlg-h" id="pvDlgTitle">Player view</h3>
-      <p style="margin:0">Players see the turn order only: names, whose turn it is, the round, and who is down. No stat blocks, hit points, rolls, books or pictures, and no account needed.</p>
+      <p style="margin:0" id="pvIntro">Players see the turn order only: names, whose turn it is, the round, and who is down. No stat blocks, hit points, rolls, books or pictures, and no account needed.</p>
       <ol class="pv-steps" id="pvSteps">
         <li>Once: open this app’s <b>Share</b> menu on claude.ai and turn on the public link, so anyone with the link can view.</li>
         <li>Send players the link below.</li>
@@ -1361,7 +1372,8 @@ button.cb-pic { cursor: zoom-in; }
       </div>
       <div id="pvSite" hidden>
         <p class="hint" id="pvNoGroups" hidden>Make a group in the Heroes tab first: each group gets its own player link.</p>
-        <div id="pvGroupBox">
+        <div id="pvGroupBox" class="pv-gcols">
+          <div class="pv-gcol">
           <div class="field"><label for="pvGroupSel">Group</label><select id="pvGroupSel"></select></div>
           <p class="pv-table on" id="pvAtTable"><b>At the table.</b> <span>Their screens show your fight and the map you show.</span></p>
           <p class="pv-table" id="pvNotTable"><span>Not at the table: their screens wait.</span> <button type="button" class="btn small" data-act="pvg-table">Put at the table</button></p>
@@ -1369,7 +1381,10 @@ button.cb-pic { cursor: zoom-in; }
             <div class="add-custom"><input id="pvGLink" readonly><button type="button" class="btn small" data-act="pvg-copy">Copy</button></div>
             <button type="button" class="btn small ghost danger" data-act="pvg-reset">Reset link</button>
           </div>
-          <div class="field"><span class="lbl">Who joined</span><ul class="seat-list" id="seatList"></ul></div>
+          </div>
+          <div class="pv-gcol">
+            <div class="field"><span class="lbl">Who joined</span><ul class="seat-list" id="seatList"></ul></div>
+          </div>
         </div>
       </div>
       <div class="row-end">
@@ -1737,7 +1752,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-204336';
+const APP_BUILD = '20261123-205523';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -5999,13 +6014,13 @@ function renderTableSheet() {
   const seats = state.seats[g.playerCode] || [], hs = heroesIn(g.id).sort((a, b) => a.name.localeCompare(b.name));
   $('#seatList').innerHTML = hs.length ? hs.map(h => {
     const s = seats.find(x => x.heroId === h.id);
-    return `<li>${heroAv(h)}<span class="seat-txt"><b>${esc(h.name)}</b>${s ? `<span class="seat-who${seatOnline(s) ? ' on' : ''}"><span class="no-tr">${esc(s.name)}</span> · <span>${seatOnline(s) ? 'online' : 'offline'}</span></span>` : '<span class="seat-free">Free</span>'}</span>`
+    return `<li>${heroAv(h).replace('avatar big', 'avatar')}<span class="seat-txt"><b>${esc(h.name)}</b>${s ? `<span class="seat-who${seatOnline(s) ? ' on' : ''}"><span class="no-tr">${esc(s.name)}</span> · <span>${seatOnline(s) ? 'online' : 'offline'}</span></span>` : '<span class="seat-free">Free</span>'}</span>`
       + (s && state.canWrite ? `<button type="button" class="btn small ghost" data-seat-free="${esc(h.id)}">Release</button>` : '') + '</li>';
   }).join('') : '<li class="hint">This group has no heroes yet. Add them in the Heroes tab.</li>';
 }
 function openTableSheet(gid) {
   if (gid) state.pvGroup = gid;
-  $('#pvSite').hidden = false; $('#pvLinkField').hidden = true;
+  $('#pvSite').hidden = false; $('#pvLinkField').hidden = true; $('#pvIntro').hidden = true; document.querySelector('.pv-dlg').classList.add('site');
   $('#pvSteps').innerHTML = '<li>Each group has its own link. Players open it, type their name and pick their character.</li><li>Only the group at the table sees your fight and the map you show. Adding a group to the fight puts it at the table.</li>';
   renderTableSheet(); $('#pvSheet').hidden = false;
 }
