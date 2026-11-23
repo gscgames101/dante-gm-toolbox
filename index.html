@@ -270,6 +270,9 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .erow-top { display: flex; gap: 6px; }
 .erow-top input { flex: 1; min-width: 0; font-weight: 700; }
 .err { color: var(--bad); font-size: .9rem; }
+.invite-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.invite-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.invite-list li.hint, .invite-list li.err { border-style: dashed; }
 .confirm-box { max-width: 420px; margin: 20vh auto 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: grid; gap: 14px; }
 .sheet.dim { background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .row-end { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
@@ -1255,6 +1258,10 @@ button.cb-pic { cursor: zoom-in; }
         <div class="set-txt"><b>Signed in</b><span class="hint" id="acctTxt"></span></div>
         <button type="button" class="btn small" data-act="dm-signout">Sign out</button>
       </div>
+      <div class="set-row" id="adminRow" hidden>
+        <div class="set-txt"><b>GMs and data</b><span class="hint">Invite GMs and move your existing bestiary into your account</span></div>
+        <button type="button" class="btn small" data-act="admin-open">Open</button>
+      </div>
       <div class="row-end"><button type="button" class="btn primary" data-act="set-close">Done</button></div>
     </div>
   </div>
@@ -1272,6 +1279,7 @@ button.cb-pic { cursor: zoom-in; }
       </ol>
       <div class="field"><label for="pvLink">Link</label>
         <div class="add-custom"><input id="pvLink" readonly><button type="button" class="btn small" data-act="pv-copy">Copy</button></div>
+        <button type="button" class="btn small ghost danger" data-act="pv-reset" id="pvReset" hidden>Reset link</button>
       </div>
       <div class="row-end">
         <button type="button" class="btn" data-act="pv-preview">Preview</button>
@@ -1331,6 +1339,28 @@ button.cb-pic { cursor: zoom-in; }
         <button type="submit" class="btn primary" id="folderSave">Save</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="sheet" id="adminSheet" hidden>
+  <div class="sheet-in gutter">
+    <div class="sheet-head">
+      <button type="button" class="btn ghost" data-act="admin-close">Close</button>
+      <h2>GMs and data</h2>
+    </div>
+    <fieldset>
+      <legend>Invited GMs</legend>
+      <p class="hint" style="margin:0">Only these Google accounts (and you) can sign in as a GM. Each GM gets their own bestiary, maps, tokens and heroes, plus the shared SRD, and their own player link.</p>
+      <ul class="invite-list" id="inviteList"></ul>
+      <form class="add-custom" id="inviteForm" autocomplete="off" novalidate><input id="inviteEmail" type="email" placeholder="name@gmail.com" aria-label="Google email to invite"><button type="submit" class="btn small primary">Invite</button></form>
+      <p class="hint" id="inviteMsg" style="margin:0" hidden></p>
+    </fieldset>
+    <fieldset>
+      <legend>Move your existing data</legend>
+      <p class="hint" style="margin:0">One time: copies the bestiary you had before GM accounts (monsters, books, groups, heroes, maps, tokens and the current fight) into your account. Monsters in your book called <b>SRD</b> go to the shared SRD list instead, which every GM sees. Nothing is deleted.</p>
+      <div class="row-end"><button type="button" class="btn primary" data-act="admin-migrate" id="migrateBtn">Move my data</button></div>
+      <p class="hint" id="migrateMsg" style="margin:0" hidden></p>
+    </fieldset>
   </div>
 </div>
 
@@ -1638,7 +1668,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-150612';
+const APP_BUILD = '20261123-174610';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -1708,6 +1738,7 @@ function renderSettings() {
   $('#backupRow').hidden = state.role !== 'dm';
   const who = SITE && SITE.user();
   $('#acctRow').hidden = !who;
+  $('#adminRow').hidden = !(SITE && state.isAdmin);
   if (who) $('#acctTxt').textContent = who.email || '';
 }
 applyPrefs();
@@ -2054,7 +2085,20 @@ function colorSwatches(sel, attr) {
   const keys = Object.keys(BOOK_COLORS);
   return keys.filter(k => !BOOK_BANDS[k]).map(sw).join('') + '<span class="sw-sep">Two-tone</span>' + keys.filter(k => BOOK_BANDS[k]).map(sw).join('');
 }
-const inBook = (m, id) => (m.bookIds || []).includes(id);
+const inBook = (m, id) => id === '__srd' ? !!m.srd : (m.bookIds || []).includes(id);
+/* Website: the shared SRD list (srd/) shows in every GM's bestiary as a read-only book. Editing an SRD monster saves a
+   personal copy (only the admin changes the shared original); it can't be deleted or filed in books. */
+state.srd = []; state.ownMonsters = []; state.isAdmin = false;
+function addSrdBook() {
+  state.books = state.books.filter(b => !b.virtual);
+  if (SITE && state.srd.length) state.books.push({ id: '__srd', name: 'SRD', color: 'slate', virtual: true, createdAt: 0 });
+}
+function setSrd(list) {
+  state.srd = list.map(m => ({ ...normalize(m), id: m.id, srd: true, bookIds: [] }));
+  state.monsters = [...(state.ownMonsters || []), ...state.srd];
+  addSrdBook(); renderList(); renderDetail();
+  if (!$('#pickSheet').hidden) renderPickList();
+}
 function sortedBooks() { return [...state.books].sort((a, b) => a.name.localeCompare(b.name)); }
 function renderShelf() {
   if (state.book !== 'all' && !state.books.some(b => b.id === state.book)) state.book = 'all';
@@ -2136,6 +2180,7 @@ async function deleteBook(id) {
 state.quickFor = null; state.qbIds = []; let qbChain = Promise.resolve();
 function openQuickBooks(id) {
   const m = state.monsters.find(x => x.id === id); if (!m) return;
+  if (m.srd) { toast('SRD monsters are shared. Duplicate one to file your own copy in your books.'); return; }
   state.quickFor = id; state.qbIds = [...(m.bookIds || [])];
   renderQuickBooks();
   $('#qbSheet').hidden = false;
@@ -2144,7 +2189,7 @@ function openQuickBooks(id) {
 function renderQuickBooks() {
   const m = state.monsters.find(x => x.id === state.quickFor); if (!m) return;
   $('#qbTitle').textContent = `Add ${m.name} to…`;
-  const books = sortedBooks();
+  const books = sortedBooks().filter(b => !b.virtual);
   $('#qbList').innerHTML = books.length
     ? books.map(b => `<button type="button" class="qb-row" data-qb="${esc(b.id)}" aria-pressed="${state.qbIds.includes(b.id)}" style="--book:${bookColor(b)}"><span class="mini-book"></span><span class="nm">${esc(b.name)}</span><span class="tick" aria-hidden="true">✓</span></button>`).join('')
     : `<p class="hint" style="margin:0">You don’t have any books yet. Tap <b>+ New book</b> to make one and put ${esc(m.name)} in it.</p>`;
@@ -2166,7 +2211,7 @@ function toggleQuickBook(bookId) {
 }
 function closeQuickBooks() { $('#qbSheet').hidden = true; state.quickFor = null; }
 function renderEdBooks(selected) {
-  const books = sortedBooks();
+  const books = sortedBooks().filter(b => !b.virtual);
   $('#edBooks').innerHTML = books.map(b => `<button type="button" class="chip" data-bk="${esc(b.id)}" aria-pressed="${selected.includes(b.id)}" style="--book:${bookColor(b)}">${esc(b.name)}</button>`).join('');
   $('#edBooksHint').textContent = books.length ? 'Tap every book this monster belongs in.' : 'No books yet. Create one with “+ New book” on the Bestiary shelf.';
 }
@@ -2768,11 +2813,15 @@ async function saveEditor(ev) {
   if (!(raw.hdCount > 0) && raw.hpFixed == null) { showErr('#edErr', 'Add hit dice or type the Hit Points before saving.'); $('#f-hdCount').focus(); return; }
   if (state.uploading) { showErr('#edErr', 'Wait for the picture to finish uploading, then save.'); return; }
   const existing = state.monsters.find(x => x.id === state.editingId);
+  const srdEdit = !!(existing && existing.srd), srdAdmin = srdEdit && state.isAdmin && SITE;
   const data = normalize(raw);
-  if (existing) data.createdAt = existing.createdAt || Date.now();
+  if (srdEdit) data.bookIds = (data.bookIds || []).filter(b => b !== '__srd');
+  if (existing && !srdEdit) data.createdAt = existing.createdAt || Date.now();
   const btn = $('#edSave'); btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    const ref = state.editingId ? state.db.collection('monsters').doc(state.editingId) : state.db.collection('monsters').doc();
+    // an SRD monster: the admin updates the shared original; anyone else saves a personal copy
+    const ref = srdAdmin ? SITE.srdDoc(state.editingId) : srdEdit ? state.db.collection('monsters').doc()
+      : state.editingId ? state.db.collection('monsters').doc(state.editingId) : state.db.collection('monsters').doc();
     if (existing && existing.hp !== data.hp) ls.set(hpKey(ref.id), null);
     await ref.set(data);
     // Clean up pictures this edit replaced or uploaded but didn't keep.
@@ -2782,7 +2831,7 @@ async function saveEditor(ev) {
     state.edUploaded = [];
     $('#editor').hidden = true;
     leftovers.forEach(id => dropAsset(id, ref.id));
-    toast(existing ? 'Saved' : `Added ${data.name}`);
+    toast(srdEdit && !srdAdmin ? 'Saved as your own copy. The shared SRD monster stays as it is.' : existing ? 'Saved' : `Added ${data.name}`);
     openMonster(ref.id);
     // Saved a monster opened from the PDF import: back to the import list if more are waiting.
     if (pdfImp.editing) { pdfImp.editing = null; if (pdfImp.found.some(f => !f.saved)) { renderPdfFound(); $('#pdfSheet').hidden = false; } }
@@ -3279,7 +3328,7 @@ async function exportForSite() {
   const btn = $('#siteExportBtn'); btn.disabled = true;
   try {
     const ids = new Set(), add = v => { if (isAssetId(v)) ids.add(v); };
-    state.monsters.forEach(m => { add(m.image); add(m.thumb); });
+    state.monsters.filter(m => !m.srd).forEach(m => { add(m.image); add(m.thumb); });
     state.groups.forEach(g => (g.players || []).forEach(p => { add(p.image); add(p.thumb); }));
     state.maps.forEach(m => { add(m.image); add(m.thumb); });
     state.tokens.forEach(t => { add(t.image); add(t.thumb); });
@@ -3289,7 +3338,7 @@ async function exportForSite() {
       siteMsg('#siteExportMsg', `Packing pictures… ${++i} of ${ids.size}`);
       try { assets[id] = await picData(id); } catch { missing++; }
     }
-    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters, books: state.books, groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, tokens: state.tokens, heroes: state.heroes, assets };
+    const data = { format: 'dante-gm-toolbox', version: 1, at: Date.now(), monsters: state.monsters.filter(m => !m.srd), books: state.books.filter(b => !b.virtual), groups: state.groups, mapFolders: state.mapFolders, maps: state.maps, tokens: state.tokens, heroes: state.heroes, assets };
     const json = JSON.stringify(data);
     const name = `dante-gm-toolbox-${new Date().toISOString().slice(0, 10)}.json`;
     const note = `${state.monsters.length} monsters, ${state.books.length} books, ${state.groups.length} groups, ${state.maps.length} maps, ${state.tokens.length} tokens, ${state.heroes.length} heroes, ${Object.keys(assets).length} pictures${missing ? ` (${missing} couldn’t be read)` : ''}.`;
@@ -3331,7 +3380,9 @@ async function importFile(file) {
     return;
   }
   if (!data || data.format !== 'dante-gm-toolbox' || !Array.isArray(data.monsters)) { siteMsg('#siteImportMsg', 'That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.', true); return; }
-  const monsters = data.monsters.filter(m => m && m.id && m.name), books = (data.books || []).filter(b => b && b.id && b.name), groups = (data.groups || []).filter(g => g && g.id);
+  // Website: monsters from a book called SRD come from the shared SRD list, so they aren't imported again.
+  const srdIds = new Set(SITE ? (data.books || []).filter(b => b && /^srd$/i.test(String(b.name || '').trim())).map(b => b.id) : []);
+  const monsters = data.monsters.filter(m => m && m.id && m.name && !(m.bookIds || []).some(b => srdIds.has(b))), books = (data.books || []).filter(b => b && b.id && b.name && !srdIds.has(b.id)), groups = (data.groups || []).filter(g => g && g.id);
   const mapFolders = (data.mapFolders || []).filter(f => f && f.id && f.name), maps = (data.maps || []).filter(m => m && m.id && isAssetId(m.image));
   const tokens = (data.tokens || []).filter(t => t && t.id && t.name);
   const heroes = (data.heroes || []).filter(h => h && h.id && h.name);
@@ -3622,9 +3673,9 @@ function replaceFromFile(monsters, books, groups, assets, mapFolders = [], maps 
         list.forEach(x => ops.push(b => b.set(db.collection(col).doc(x.id), toDoc(x))));
         have.filter(x => !keep.has(x.id)).forEach(x => ops.push(b => b.delete(db.collection(col).doc(x.id))));
       };
-      mirror('books', books, state.books, ({ id, ...b }) => b);
+      mirror('books', books, state.books.filter(b => !b.virtual), ({ id, ...b }) => b);
       mirror('groups', groups, state.groups, ({ id, ...g }) => ({ name: g.name, color: g.color || 'navy', players: cleanPlayers(g.players), createdAt: g.createdAt || Date.now() }));
-      mirror('monsters', monsters, state.monsters, ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
+      mirror('monsters', monsters, state.monsters.filter(m => !m.srd), ({ id, ...m }) => JSON.parse(JSON.stringify(m)));
       mirror('mapFolders', mapFolders, state.mapFolders, ({ id, ...f }) => ({ name: f.name, color: f.color, createdAt: f.createdAt || Date.now() }));
       mirror('maps', maps, state.maps, ({ id, ...m }) => ({ name: str(m.name) || 'Map', folderId: m.folderId || null, image: m.image, thumb: m.thumb || '',
         w: num(m.w, 1000), h: num(m.h, 1000), marks: cleanMarks(m.marks), fog: cleanFog(m.fog), tokens: cleanToks(m.tokens), createdAt: m.createdAt || Date.now() }));
@@ -3910,7 +3961,9 @@ function showPlayers() {
   document.addEventListener('pointerdown', keepAwake, { passive: true });  // some browsers only allow it after a tap
   if (SITE) {
     // Website: follow the DM's live turn order. The sign-in button is for the DM (hidden on the #players link).
-    $('#pvSignin').hidden = location.hash === '#players';
+    $('#pvSignin').hidden = !!SITE.linkCode();
+    // no player code in the address: this is the site's front door, not a players' screen
+    if (!SITE.linkCode()) $('#pvEmpty').innerHTML = '<h3>Dante’s GM Toolbox</h3><p>Players: open the link your GM sent you. GMs: sign in below.</p>';
     renderPlayerView(null);
     SITE.watchPlayers(d => { reloadIfOutdated(d); renderPlayerView(d); });
     if (SITE.watchMap) SITE.watchMap(d => { reloadIfOutdated(d); setPvMap(d && d.map); });
@@ -4422,6 +4475,7 @@ document.addEventListener('click', async ev => {
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
   if (t.dataset.lang && t.closest('.lang-seg')) { setLang(t.dataset.lang); return; }
+  if (t.dataset.uninvite) { const e = t.dataset.uninvite; showConfirm(`Remove ${e} as a GM? They can't sign in any more; their data stays in the database.`, 'Remove', async () => { try { await SITE.invites.remove(e); renderInvites(); } catch (err) { toast(saveErrorText(err)); } }); return; }
   if (t.dataset.hgroup) { state.heroGroup = t.dataset.hgroup; ls.set('pb-hgroup', state.heroGroup); renderHeroes(); return; }
   if (t.dataset.heroedit) { openHeroDlg(state.heroes.find(h => h.id === t.dataset.heroedit)); return; }
   if (t.dataset.herogrp && state.heroEd) { const g = t.dataset.herogrp, ids = state.heroEd.groupIds; state.heroEd.groupIds = ids.includes(g) ? ids.filter(x => x !== g) : [...ids, g]; renderHeroDlg(); return; }
@@ -4484,14 +4538,23 @@ document.addEventListener('click', async ev => {
     case 'pic-remove': state.edImage = ''; state.edThumb = ''; renderPic(); break;
     case 'back': setView('list'); break;
     case 'close-sb': state.selectedId = null; setView('list'); renderList(); renderDetail(); break;
-    case 'delete': if (m) { state.pendingDelete = m.id; showConfirm(`Delete ${m.name}? This removes it from every device.`, 'Delete', null); } break;
+    case 'delete': if (m && m.srd && !state.isAdmin) { toast('SRD monsters are shared and can’t be deleted. Duplicate one to make your own.'); break; }
+      if (m) { state.pendingDelete = m.id; showConfirm(`Delete ${m.name}? This removes it from every device.`, 'Delete', null); } break;
     case 'confirm-no': $('#confirm').hidden = true; state.pendingDelete = null; state.confirmFn = null; break;
     case 'turn-next': moveTurn(1); break;
     case 'send-rolls': clearTimeout(playersTimer); publishPlayers(); break;
     case 'turn-prev': moveTurn(-1); break;
+    case 'admin-open': $('#setSheet') && ($('#setSheet').hidden = true); openAdmin(); break;
+    case 'admin-close': $('#adminSheet').hidden = true; break;
+    case 'admin-migrate': showConfirm('Copy your existing bestiary into your GM account now? Monsters in the SRD book go to the shared SRD list.', 'Move my data', migrateData); break;
+    case 'pv-reset': if (SITE) showConfirm('Make a new player link? The current link stops working; send your players the new one.', 'Reset link', async () => {
+      try { $('#pvLink').value = await SITE.resetPlayerLink(); mapSentKey = null; playersSentKey = null; schedulePlayersUpdate(0); if (state.shownMap) pushMapSoon(0); toast('New player link ready. Copy it and send it to your players.'); }
+      catch (e) { toast(saveErrorText(e)); }
+    }); break;
     case 'pv-share':
-      $('#pvLink').value = SITE ? location.origin + location.pathname + '#players' : PLAYER_URL;
-      if (SITE) $('#pvSteps').innerHTML = '<li>Send players the link below. They don’t need an account.</li><li>Their screen changes by itself the moment you press <b>Start</b>, <b>Next</b> or <b>Prev</b>, or roll from a monster’s stat block.</li>';
+      $('#pvLink').value = SITE ? SITE.playerLink() : PLAYER_URL;
+      $('#pvReset').hidden = !SITE;
+      if (SITE) $('#pvSteps').innerHTML = '<li>Send players the link below. It belongs to your account, and they don’t need one.</li><li>Their screen changes by itself the moment you press <b>Start</b>, <b>Next</b> or <b>Prev</b>, or roll from a monster’s stat block.</li><li><b>Reset link</b> makes a new one; the old link stops working.</li>';
       $('#pvSheet').hidden = false; break;
     case 'folder-new': openFolderDlg(null); break;
     case 'folder-edit': { const f = state.mapFolders.find(x => x.id === state.mapFolder); if (f) openFolderDlg(f); break; }
@@ -4568,7 +4631,7 @@ document.addEventListener('click', async ev => {
     case 'pv-preview': $('#pvSheet').hidden = true; state.previewPlayer = true; setRole('player'); renderPlayerView(publicEnc()); setPvMap(publicMap()); break;
     case 'pv-exit': state.previewPlayer = false; $('#playerView').classList.remove('map-mode'); setRole('dm'); setTab('init'); break;
     case 'book-new': openBookDlg(null); break;
-    case 'book-edit': { const b = state.books.find(x => x.id === state.book); if (b) openBookDlg(b); break; }
+    case 'book-edit': { const b = state.books.find(x => x.id === state.book); if (b && b.virtual) { toast('The SRD book is shared by every GM and can’t be edited.'); break; } if (b) openBookDlg(b); break; }
     case 'book-cancel': $('#bookSheet').hidden = true; if (state.quickFor) $('#qbSheet').hidden = false; break;
     case 'qb-close': closeQuickBooks(); break;
     case 'qb-newbook': $('#qbSheet').hidden = true; openBookDlg(null); break;
@@ -4622,7 +4685,7 @@ document.addEventListener('click', async ev => {
       if (!id || !state.db) return;
       const gone = state.monsters.find(x => x.id === id) || {};
       const name = gone.name;
-      try { await state.db.collection('monsters').doc(id).delete(); ls.set(hpKey(id), null); dropAsset(gone.image, id); dropAsset(gone.thumb, id); state.selectedId = null; setView('list'); renderList(); renderDetail(); toast(`Deleted ${name}`); }
+      try { await (gone.srd && SITE ? SITE.srdDoc(id) : state.db.collection('monsters').doc(id)).delete(); ls.set(hpKey(id), null); dropAsset(gone.image, id); dropAsset(gone.thumb, id); state.selectedId = null; setView('list'); renderList(); renderDetail(); toast(`Deleted ${name}`); }
       catch (e) { toast(saveErrorText(e)); }
       break;
     }
@@ -5968,12 +6031,63 @@ function setupFullscreen() {
   syncFullscreen();
 }
 
+/* ---------- website admin: invited GMs, moving the old single-DM data ---------- */
+async function openAdmin() {
+  if (!SITE || !state.isAdmin) return;
+  $('#adminSheet').hidden = false; $('#inviteMsg').hidden = true; $('#migrateMsg').hidden = true;
+  renderInvites();
+}
+async function renderInvites() {
+  const el = $('#inviteList');
+  try {
+    const list = (await SITE.invites.list()).sort((a, b) => a.email.localeCompare(b.email));
+    el.innerHTML = list.length ? list.map(i => `<li><span class="no-tr">${esc(i.email)}</span><button type="button" class="btn small ghost danger" data-uninvite="${esc(i.email)}">Remove</button></li>`).join('')
+      : '<li class="hint">No one invited yet.</li>';
+  } catch (e) { el.innerHTML = `<li class="err">${esc(saveErrorText(e))}</li>`; }
+}
+$('#inviteForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = str($('#inviteEmail').value).toLowerCase(), msg = $('#inviteMsg');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.hidden = false; msg.className = 'err'; msg.textContent = 'Type a Google email address.'; return; }
+  try {
+    await SITE.invites.add(email); $('#inviteEmail').value = '';
+    msg.hidden = false; msg.className = 'hint ok'; msg.textContent = `Invited ${email}. They can now sign in on this site as a GM.`;
+    renderInvites();
+  } catch (err) { msg.hidden = false; msg.className = 'err'; msg.textContent = saveErrorText(err); }
+});
+async function migrateData() {
+  const btn = $('#migrateBtn'), msg = $('#migrateMsg');
+  btn.disabled = true; msg.hidden = false; msg.className = 'hint';
+  try {
+    const c = await SITE.migrateLegacy(t => { msg.textContent = t; });
+    msg.className = 'hint ok';
+    msg.textContent = `Done: ${c.personal} items moved into your account, ${c.srd} monsters into the shared SRD list.`
+      + (c.srdAlsoPersonal ? ` ${c.srdAlsoPersonal} SRD monsters were also in other books of yours; you keep your own copy of those in those books.` : '') + ' Reloading…';
+    setTimeout(() => location.reload(), 2500);
+  } catch (err) { msg.className = 'err'; msg.textContent = 'The move stopped: ' + saveErrorText(err) + ' Nothing was lost; try again.'; btn.disabled = false; }
+}
+window.SITE_t = k => trStr(k === 'notInvited' ? 'This Google account isn’t invited to be a GM here. Ask the toolbox owner for an invite.' : k);
+
 /* ---------- language: English / Português (Brasil) ----------
    The app is written in English. In Portuguese, a translation layer swaps the text as it appears on screen (text,
    placeholders, tooltips, labels) using the table below; switching back restores the English. It only ever replaces
    a whole piece of text that matches the table, so monsters, names and notes you typed are left alone.
    The DM's choice also goes to the players' screens. */
 const PT = {
+  "Remove": "Remover", "GMs and data": "Mestres e dados", "Invite GMs and move your existing bestiary into your account": "Convide mestres e mova seu bestiário atual para a sua conta",
+  "Invited GMs": "Mestres convidados", "Only these Google accounts (and you) can sign in as a GM. Each GM gets their own bestiary, maps, tokens and heroes, plus the shared SRD, and their own player link.": "Só estas contas Google (e você) podem entrar como mestre. Cada mestre tem o próprio bestiário, mapas, tokens e heróis, além do SRD compartilhado, e o próprio link dos jogadores.",
+  "Google email to invite": "E-mail Google a convidar", "Invite": "Convidar", "No one invited yet.": "Ninguém convidado ainda.", "Type a Google email address.": "Digite um endereço de e-mail Google.",
+  "Move your existing data": "Mover seus dados atuais", "One time: copies the bestiary you had before GM accounts (monsters, books, groups, heroes, maps, tokens and the current fight) into your account. Monsters in your book called ": "Uma vez só: copia o bestiário que você tinha antes das contas de mestre (monstros, livros, grupos, heróis, mapas, tokens e o combate atual) para a sua conta. Os monstros do seu livro chamado ",
+  " go to the shared SRD list instead, which every GM sees. Nothing is deleted.": " vão para a lista SRD compartilhada, que todos os mestres veem. Nada é excluído.",
+  "Move my data": "Mover meus dados", "Copy your existing bestiary into your GM account now? Monsters in the SRD book go to the shared SRD list.": "Copiar seu bestiário atual para a sua conta de mestre agora? Os monstros do livro SRD vão para a lista SRD compartilhada.",
+  "Reset link": "Novo link", "Make a new player link? The current link stops working; send your players the new one.": "Criar um novo link dos jogadores? O link atual para de funcionar; envie o novo aos jogadores.",
+  "New player link ready. Copy it and send it to your players.": "Novo link dos jogadores pronto. Copie e envie aos jogadores.",
+  "SRD monsters are shared. Duplicate one to file your own copy in your books.": "Os monstros do SRD são compartilhados. Duplique um para guardar sua própria cópia nos seus livros.",
+  "Saved as your own copy. The shared SRD monster stays as it is.": "Salvo como sua própria cópia. O monstro do SRD compartilhado continua como estava.",
+  "SRD monsters are shared and can’t be deleted. Duplicate one to make your own.": "Os monstros do SRD são compartilhados e não podem ser excluídos. Duplique um para ter o seu.",
+  "The SRD book is shared by every GM and can’t be edited.": "O livro SRD é compartilhado por todos os mestres e não pode ser editado.",
+  "Players: open the link your GM sent you. GMs: sign in below.": "Jogadores: abram o link que o mestre enviou. Mestres: entrem abaixo.",
+  "This Google account isn’t invited to be a GM here. Ask the toolbox owner for an invite.": "Esta conta Google não foi convidada para ser mestre aqui. Peça um convite ao dono da ferramenta.",
   // tabs, header, general
   "Bestiary": "Bestiário", "Initiative": "Iniciativa", "Maps": "Mapas", "Tokens": "Tokens", "Heroes": "Heróis", "Sections": "Seções",
   "Settings": "Configurações", "Full screen": "Tela cheia", "Exit full screen": "Sair da tela cheia", "Connecting…": "Conectando…", "Synced": "Sincronizado",
@@ -6194,6 +6308,11 @@ const ptType = t => PT_TYPE[t.toLowerCase()] || t;
 const PT_SENSE = { darkvision: 'visão no escuro', blindsight: 'percepção às cegas', tremorsense: 'sentido sísmico', truesight: 'visão verdadeira', 'passive Perception': 'Percepção passiva' };
 // Text with numbers or names in it.
 const PT_RX = [
+  [/^Invited (.+)\. They can now sign in on this site as a GM\.$/, 'Convite enviado a $1. Agora pode entrar neste site como mestre.'],
+  [/^Remove (.+) as a GM\? They can't sign in any more; their data stays in the database\.$/, 'Remover $1 como mestre? Não poderá mais entrar; os dados continuam no banco de dados.'],
+  [/^Done: (\d+) items moved into your account, (\d+) monsters into the shared SRD list\.(?: (\d+) SRD monsters were also in other books of yours; you keep your own copy of those in those books\.)? Reloading…$/,
+    (m, a, b, c) => `Pronto: ${a} itens movidos para a sua conta, ${b} monstros para a lista SRD compartilhada.${c ? ` ${c} monstros do SRD também estavam em outros livros seus; você fica com sua cópia nesses livros.` : ''} Recarregando…`],
+  [/^The move stopped: (.+) Nothing was lost; try again\.$/, 'A mudança parou: $1 Nada foi perdido; tente de novo.'],
   [/^(\d+) monsters?$/, (m, n) => `${n} monstro${n == 1 ? '' : 's'}`], [/^(\d+) heroes$/, (m, n) => `${n} heróis`], [/^(\d+) hero(es)?$/, (m, n) => `${n} herói${n == 1 ? '' : 's'}`],
   [/^(\d+) maps?$/, (m, n) => `${n} mapa${n == 1 ? '' : 's'}`], [/^Round (\d+)$/, 'Rodada $1'], [/^Current turn · round (\d+)$/, 'Turno atual · rodada $1'],
   [/^Updated (.+)$/, 'Atualizado $1'], [/^Linked: (.+) \(hidden\)$/, 'Vinculado: $1 (oculto)'], [/^Linked: (.+)$/, 'Vinculado: $1'],
@@ -6309,6 +6428,7 @@ async function connect() {
   setRole('dm');
   if (!db) { state.loaded = true; setSync('Not connected · read-only', 'warn'); setReadOnly(); return; }
   state.db = db;
+  if (SITE) { SITE.watchSrd(setSrd); SITE.isAdmin().then(v => { state.isAdmin = v; renderSettings(); }); }
   try { state.artifact = await c.use('artifact'); } catch { state.artifact = null; }
   // Picture reading for the stat block importer (owner only; spends their own Claude usage, asks first)
   try {
@@ -6340,6 +6460,7 @@ async function connect() {
   db.collection('books').onSnapshot(snap => {
     state.books = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(b => b.name);
     ls.set('pb-books', state.books);
+    addSrdBook();
     renderList(); renderDetail();
   }, () => {});
   db.collection('mapFolders').onSnapshot(snap => {
@@ -6367,9 +6488,10 @@ async function connect() {
   });
   else { const pm = (readPub() || {}).map; state.shownMap = pm ? { id: pm.id, sentAt: pm.sentAt } : null; ls.set('pb-shown-map', state.shownMap); $('#mapBadge').hidden = !state.shownMap; }
   db.collection('monsters').onSnapshot(snap => {
-    state.monsters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    state.ownMonsters = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     state.loaded = true;
-    ls.set('pb-cache', state.monsters);
+    ls.set('pb-cache', state.ownMonsters);
+    state.monsters = [...state.ownMonsters, ...(state.srd || [])];
     setSync(snap.metadata.fromCache ? 'Syncing…' : 'Synced', snap.metadata.fromCache ? 'idle' : 'live');
     renderList(); renderDetail();
     if ($('#app').dataset.tab === 'init') renderEncounter();
@@ -6384,10 +6506,11 @@ async function connect() {
 buildEditorStatic();
 state.sort = ls.get('pb-sort', 'name'); $('#sort').value = state.sort;
 state.monsters = ls.get('pb-cache', []) || [];
+state.ownMonsters = state.monsters;
 state.enc = cleanEnc(ls.get('pb-enc', null));
 state.role = 'boot'; state.previewPlayer = false;
 // The player link (…#players) always opens the player screen, even for the DM (handy for a TV).
-const playerLink = location.hash === '#players';
+const playerLink = /^#players(\/|$)/.test(location.hash);
 // This device has been used by the DM before: show the app right away instead of waiting.
 if (!playerLink && (ls.get('pb-role', '') === 'dm' || (ls.get('pb-cache', []) || []).length)) setRole('dm');
 state.books = (ls.get('pb-books', []) || []).filter(b => b && b.id && b.name);
