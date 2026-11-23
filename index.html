@@ -359,6 +359,9 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .pv-head h2 { font-family: var(--display); font-weight: 400; font-size: 1.8rem; color: var(--accent); }
 .pv-head .round b { font-size: 1.9rem; }
 .pv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* where the next round starts in the looping turn order */
+.pv-round-sep { display: flex; align-items: center; gap: 10px; padding-block: 2px; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.pv-round-sep::before, .pv-round-sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .pv { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); font-size: 1.1rem; }
 .pv-pos { font-family: var(--mono); font-size: .85rem; color: var(--muted); width: 2ch; text-align: right; }
 .pv-thumb { flex: none; width: 48px; height: 48px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); overflow: hidden; display: grid; place-items: center; font-family: var(--display); font-size: 1.3rem; color: var(--muted); }
@@ -1536,7 +1539,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-130403';
+const APP_BUILD = '20261123-131540';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3742,7 +3745,11 @@ function renderPlayerView(d) {
       ${pvRollText(r)}
       <span class="tot${r.crit === 'crit' ? ' crit' : r.crit === 'fumble' ? ' fumble' : ''}">${+r.total}${r.crit === 'crit' ? ' ★' : ''}</span>
     </li>`).join('');
-  $('#pvList').innerHTML = list.map((c, i) => `
+  // Once the fight has started the list loops: it starts with whoever is up next and wraps around, ending with the
+  // creature whose turn it is (also shown in the card above). A divider marks where the next round begins.
+  const order = ti >= 0 ? [...list.keys()].slice(ti + 1).concat([...list.keys()].slice(0, ti + 1)) : [...list.keys()];
+  const nextRound = (+(d && d.round) || 0) + 1;
+  $('#pvList').innerHTML = order.map(i => [i, list[i]]).map(([i, c]) => (ti >= 0 && i === 0 ? `<li class="pv-round-sep" aria-hidden="true"><span>Round ${nextRound}</span></li>` : '') + `
     <li class="pv${c.pc ? ' pc' : ' mon'}${i === ti ? ' now' : ''}${c.down ? ' down' : ''}"${i === ti ? ' aria-current="true"' : ''}>
       <span class="pv-pos">${i + 1}</span>
       ${isAssetId(c.img)
@@ -3764,13 +3771,9 @@ function renderPlayerView(d) {
       <span class="who"><b>${esc(cur.name)}</b>${cur.pc ? '<span class="pc-tag">PC</span>' : ''}</span>
       ${nx && nx !== cur ? `<span class="nx">Up next: <b>${esc(nx.name)}</b></span>` : ''}`;
     if (pvNowKey !== null && key !== pvNowKey) { nowEl.classList.remove('fresh'); void nowEl.offsetWidth; nowEl.classList.add('fresh'); }
-    // A new turn (or the first time this screen shows the fight): scroll the list so that creature is in the middle.
+    // A new turn: back to the top of the list, so whoever is up next sits right under the card.
     // Only on a turn change, so players can still scroll around freely in between.
-    const first = pvNowKey === null;
-    if (key !== pvNowKey) requestAnimationFrame(() => {
-      const row = document.querySelector('#pvList .pv.now');
-      if (row && row.offsetParent) row.scrollIntoView({ block: 'center', behavior: first || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-    });
+    if (key !== pvNowKey) requestAnimationFrame(() => { const col = document.querySelector('.pv-col-list'); if (col) col.scrollTop = 0; $('#playerView').scrollTop = 0; });
     pvNowKey = key;
   } else if (d) pvNowKey = '';
 }
