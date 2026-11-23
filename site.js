@@ -46,10 +46,11 @@
   const isAdmin = () => adminCheck || (adminCheck = isGM().then(ok => ok ? fs.collection('invites').limit(1).get().then(() => true, () => false) : false));
 
   /* The app's database, scoped to this GM. */
-  const GM_COLS = new Set(['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens']);
+  const GM_COLS = new Set(['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens', 'settings']);
+  let tableCode = null;  // the player link of the group at the table: their screens get public/current and public/map
   const mapPath = p => {
     const segs = String(p).split('/'), uid = auth.currentUser && auth.currentUser.uid;
-    if (segs[0] === 'public' && segs.length === 2) return `play/${gm && gm.playerCode}/state/${segs[1]}`;
+    if (segs[0] === 'public' && segs.length === 2) return `play/${tableCode || '_none'}/state/${segs[1]}`;
     if (GM_COLS.has(segs[0]) && uid) return `gms/${uid}/${p}`;
     return p;  // assets, srd, …
   };
@@ -189,24 +190,44 @@
       try { localStorage.removeItem('pb-role'); localStorage.removeItem('pb-cache'); } catch {}
       location.href = location.pathname;
     },
-    user: () => auth.currentUser,
+    user: () => (auth.currentUser && !auth.currentUser.isAnonymous ? auth.currentUser : null),
     isAdmin,
-    // players' screen
+    // players' screen (…#players/<group code>)
     linkCode,
     inviteCode,
     watchPlayers: cb => { const c = linkCode(); if (!c) { cb(null); return () => {}; } return playDoc(c, 'current').onSnapshot(s => cb(s.exists ? s.data() : null), () => cb(null)); },
-    watchMap: cb => { const c = linkCode() || (gm && gm.playerCode); if (!c) { cb(null); return () => {}; } return playDoc(c, 'map').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}); },
-    playerLink: () => gm && gm.playerCode ? location.origin + location.pathname + '#players/' + gm.playerCode : '',
-    // A new code: the old link stops working (its screen data is removed).
-    async resetPlayerLink() {
+    watchMap: cb => { const c = linkCode() || tableCode; if (!c) { cb(null); return () => {}; } return playDoc(c, 'map').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}); },
+    /* Group player links. play/<code> = {gm, groupId}; play/<code>/state/{roster,current,map}; play/<code>/seats/<heroId>. */
+    groupLink: code => location.origin + location.pathname + '#players/' + code,
+    async makeGroupCode(groupId) {
       if (!(await isGM())) throw new Error('not a GM');
-      const old = gm.playerCode, code = code6();
-      // clear the old screen first: the rules only let a GM write under their current code
-      for (const n of ['current', 'map']) { try { await playDoc(old, n).delete(); } catch {} }
-      await fs.doc('gms/' + auth.currentUser.uid).set({ playerCode: code }, { merge: true });
-      gm.playerCode = code;
-      return location.origin + location.pathname + '#players/' + code;
+      const code = code6();
+      await fs.doc('play/' + code).set({ gm: auth.currentUser.uid, groupId, at: Date.now() });
+      return code;
     },
+    // a group's old link: its screens, seats and the link itself go away
+    async dropGroupCode(code) {
+      if (!code) return;
+      try { const s = await fs.collection(`play/${code}/seats`).get(); await Promise.all(s.docs.map(d => d.ref.delete())); } catch {}
+      for (const n of ['current', 'map', 'roster']) { try { await playDoc(code, n).delete(); } catch {} }
+      try { await fs.doc('play/' + code).delete(); } catch {}
+    },
+    setTable: code => { tableCode = code || null; },
+    tableCode: () => tableCode,
+    writePlay: (code, name, data) => playDoc(code, name).set(data),
+    clearPlay: async code => { for (const n of ['current', 'map']) { try { await playDoc(code, n).delete(); } catch {} } },
+    watchSeats: (code, cb) => fs.collection(`play/${code}/seats`).onSnapshot(s => cb(s.docs.map(d => ({ ...d.data(), heroId: d.id }))), () => cb([])),
+    releaseSeat: (code, heroId) => fs.doc(`play/${code}/seats/${heroId}`).delete(),
+    // the player's side: an anonymous account per device, so a seat can only be changed by whoever took it
+    async playerAuth() {
+      await signedIn;
+      if (!auth.currentUser) { try { await auth.signInAnonymously(); } catch { return null; } }
+      return auth.currentUser.uid;
+    },
+    watchRoster: cb => { const c = linkCode(); if (!c) { cb(null); return () => {}; } return playDoc(c, 'roster').onSnapshot(s => cb(s.exists ? s.data() : null), () => cb(null)); },
+    takeSeat: (code, heroId, name) => fs.doc(`play/${code}/seats/${heroId}`).set({ uid: auth.currentUser.uid, name, at: Date.now(), seen: Date.now() }),
+    seatSeen: (code, heroId) => fs.doc(`play/${code}/seats/${heroId}`).update({ seen: Date.now() }),
+    myUid: () => auth.currentUser && auth.currentUser.uid,
     // the shared SRD list
     watchSrd: cb => fs.collection('srd').onSnapshot(s => cb(s.docs.map(d => ({ ...d.data(), id: d.id }))), () => cb([])),
     srdDoc: id => fs.doc('srd/' + id),

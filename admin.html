@@ -430,8 +430,8 @@ main { padding-block: 20px 48px; display: grid; gap: 18px; }
     }
     return { n, bytes };
   }
-  const GM_COLS = ['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens'];
-  const OLD_COLS = [...GM_COLS, 'public', 'meta'];
+  const GM_COLS = ['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens', 'settings'];
+  const OLD_COLS = ['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens', 'public', 'meta'];
   $('#calc').addEventListener('click', async () => {
     const btn = $('#calc'); btn.disabled = true;
     const say = m => { $('#stWhen').textContent = m; };
@@ -442,9 +442,10 @@ main { padding-block: 20px 48px; display: grid; gap: 18px; }
         const uid = d.id, row = out.byUid[uid] = { data: docSize(d), pics: 0, docs: 1 };
         say(t('Reading {0}…', gmName(uid)));
         for (const c of GM_COLS) { const r = await readAll(`gms/${uid}/${c}`, 300); row.data += r.bytes; row.docs += r.n; }
-        const code = d.data().playerCode;
-        if (code) { const r = await readAll(`play/${code}/state`, 10); out.play += r.bytes; }
       }
+      say(t('Reading {0}…', 'play'));  // group player links: their screens and seats
+      out.play += (await readAll('play', 100)).bytes;
+      for (const d of (await fs.collection('play').get()).docs) for (const sub of ['state', 'seats']) out.play += (await readAll(`play/${d.id}/${sub}`, 50)).bytes;
       say(t('Reading {0}…', 'SRD')); out.srd = (await readAll('srd', 300)).bytes;
       for (const c of OLD_COLS) { say(t('Reading {0}…', c)); out.legacyData += (await readAll(c, 300)).bytes; }
       for (const c of ['logins', 'invites', 'inviteCodes', 'adminStats']) out.other += (await readAll(c, 300)).bytes;

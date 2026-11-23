@@ -342,6 +342,40 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .login-players { margin: 0; }
 .login-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .login-foot .lang-seg { flex: 1; max-width: 240px; }
+/* Website: joining a group's table, and the player's own character */
+.join-card { width: min(560px, 100%); text-align: left; }
+.join-card .login-title, .join-card .login-sub { text-align: center; }
+.join-form { display: grid; gap: 14px; }
+.join-form input { width: 100%; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-size: 1.05rem; }
+.join-heroes { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.join-hero { width: 100%; display: grid; justify-items: center; gap: 6px; padding: 12px 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); text-align: center; }
+.join-hero .avatar.big { width: 64px; height: 64px; }
+.join-hero b { overflow-wrap: anywhere; line-height: 1.2; }
+.join-hero[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent) inset; }
+.join-hero:disabled { opacity: .5; cursor: not-allowed; }
+.join-taken { font-size: .8rem; color: var(--muted); }
+.login-go:disabled { opacity: .45; cursor: not-allowed; }
+.pv-me { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); }
+.pv-me b { color: var(--mine); }
+:root { --mine: #b07800; } :root[data-theme="dark"] { --mine: #f0c040; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --mine: #f0c040; } }
+.pv.mine { box-shadow: inset 5px 0 0 var(--mine); }
+.pv.mine .pv-name { color: var(--mine); font-weight: 700; }
+.pv-now.mine { border-color: var(--mine); background: color-mix(in srgb, var(--mine) 14%, var(--surface)); }
+.pv-now.mine .k { color: var(--mine); font-size: .85rem; }
+.pv-now .nx.mine, .pv-now .nx.mine b { color: var(--mine); font-weight: 700; }
+.seat-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.seat-list li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; }
+.seat-txt { flex: 1; min-width: 0; display: grid; }
+.seat-txt b { overflow-wrap: anywhere; }
+.seat-who, .seat-free { font-size: .85rem; color: var(--muted); }
+.seat-who.on { color: var(--good); }
+.seat-who.on::before, .cb-player.on::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--good); margin-right: 5px; vertical-align: 1px; }
+.pv-table { margin: 0; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pv-table.on { border-style: solid; border-color: var(--good); }
+.pv-table.on b { color: var(--good); }
+.cb-player { font-size: .8rem; color: var(--muted); margin-left: 8px; }
+.cb-player.on { color: var(--good); }
 /* Roles: "boot" until we know who is viewing, "player" for shared viewers (or the DM's preview), "dm" for the owner. */
 .player-view, .boot { display: none; }
 .app[data-role="boot"] main, .app[data-role="boot"] .tabs, .app[data-role="boot"] #newBtn, .app[data-role="boot"] .tray { display: none; }
@@ -975,6 +1009,7 @@ button.cb-pic { cursor: zoom-in; }
         <span>This is what your players see.</span>
         <button type="button" class="btn small" data-act="pv-exit">Back to DM view</button>
       </div>
+      <div class="pv-me" id="pvMe" hidden><span><b class="no-tr" id="pvMeName"></b> <span>playing</span> <b class="no-tr" id="pvMeHero"></b></span><button type="button" class="btn small ghost" data-act="pv-change">Change character</button></div>
       <div class="pv-cols">
         <div class="pv-col pv-col-list">
           <div class="pv-top">
@@ -1001,6 +1036,19 @@ button.cb-pic { cursor: zoom-in; }
     </div>
   </main>
   <div class="boot" id="boot"><p>Opening…</p></div>
+  <!-- Website: a player opening their group's link joins with a name and a character -->
+  <section class="login-view join-view" id="joinView" hidden>
+    <div class="login-card join-card">
+      <h1 class="login-title no-tr" id="joinGroup"></h1>
+      <p class="login-sub">Join the table</p>
+      <p class="login-note err" id="joinGone" hidden></p>
+      <form id="joinForm" class="join-form" autocomplete="off">
+        <div class="field"><label for="joinName">Your name</label><input id="joinName" maxlength="40" placeholder="e.g. Ana"></div>
+        <div class="field"><span class="lbl">Your character</span><ul class="join-heroes" id="joinHeroes"></ul></div>
+        <button type="submit" class="btn primary login-go" id="joinGo" disabled>Join</button>
+      </form>
+    </div>
+  </section>
   <!-- Website front door (no player code in the address): GM sign-in, and the admin's way to the admin page -->
   <section class="login-view" id="loginView" hidden>
     <div class="login-card">
@@ -1303,9 +1351,22 @@ button.cb-pic { cursor: zoom-in; }
         <li>Send players the link below.</li>
         <li>Their page updates each time you press <b>Start</b>, <b>Next</b> or <b>Prev</b>. Your screen refreshes for a moment when it does.</li>
       </ol>
-      <div class="field"><label for="pvLink">Link</label>
+      <div class="field" id="pvLinkField"><label for="pvLink">Link</label>
         <div class="add-custom"><input id="pvLink" readonly><button type="button" class="btn small" data-act="pv-copy">Copy</button></div>
         <button type="button" class="btn small ghost danger" data-act="pv-reset" id="pvReset" hidden>Reset link</button>
+      </div>
+      <div id="pvSite" hidden>
+        <p class="hint" id="pvNoGroups" hidden>Make a group in the Heroes tab first: each group gets its own player link.</p>
+        <div id="pvGroupBox">
+          <div class="field"><label for="pvGroupSel">Group</label><select id="pvGroupSel"></select></div>
+          <p class="pv-table on" id="pvAtTable"><b>At the table.</b> <span>Their screens show your fight and the map you show.</span></p>
+          <p class="pv-table" id="pvNotTable"><span>Not at the table: their screens wait.</span> <button type="button" class="btn small" data-act="pvg-table">Put at the table</button></p>
+          <div class="field"><label for="pvGLink">This group’s player link</label>
+            <div class="add-custom"><input id="pvGLink" readonly><button type="button" class="btn small" data-act="pvg-copy">Copy</button></div>
+            <button type="button" class="btn small ghost danger" data-act="pvg-reset">Reset link</button>
+          </div>
+          <div class="field"><span class="lbl">Who joined</span><ul class="seat-list" id="seatList"></ul></div>
+        </div>
       </div>
       <div class="row-end">
         <button type="button" class="btn" data-act="pv-preview">Preview</button>
@@ -1672,7 +1733,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-195021';
+const APP_BUILD = '20261123-203613';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3798,6 +3859,7 @@ function restoreScreen() {
 }
 async function publishPlayers() {
   // Website: players watch one shared document, so their screens change instantly and nothing reloads.
+  if (SITE && !SITE.tableCode()) return;  // no group at the table yet
   if (SITE) {
     // Send first, then redraw this screen, so the players' update leaves as early as possible.
     const before = state.enc.pubAt || 0;
@@ -3855,7 +3917,7 @@ function publicEnc() {
       // players carry their own picture (from their group); monsters use their bestiary picture
       const src = c.kind === 'monster' ? (state.monsters.find(x => x.id === c.monsterId) || {}) : { image: c.img, thumb: c.thumb };
       const img = isAssetId(src.image) ? src.image : '';
-      return { id: c.id, name: c.name, pc: c.kind === 'pc', down: c.kind === 'monster' && c.hp <= 0, img, thumb: img && isAssetId(src.thumb) ? src.thumb : '' };
+      return { id: c.id, name: c.name, pc: c.kind === 'pc', heroId: c.kind === 'pc' ? c.heroId || '' : '', down: c.kind === 'monster' && c.hp <= 0, img, thumb: img && isAssetId(src.thumb) ? src.thumb : '' };
     }),
     rolls: (state.enc.log || []).filter(r => !hiddenNames.has(r.who)).slice(0, 12).map(r => ({ who: r.who, label: r.label, pretty: r.pretty, rolls: r.rolls, total: r.total, crit: r.crit, round: r.round }))
   };
@@ -3881,6 +3943,8 @@ const pvRollText = r => `<span class="what">
 </span>`;
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
+  if (d) state.pvLast = d;
+  const isMine = c => !!(state.me && c && c.heroId && c.heroId === state.me.heroId);
   if (d && d.lang && state.role === 'player' && !state.previewPlayer && d.lang !== LANG) setLang(d.lang, false);  // follow the DM's language
   // whose turn it is: their token glows on the players' map
   if (d && (d.turnId || null) !== state.pvTurnId) { state.pvTurnId = d.turnId || null; if (state.pvMapData && !$('#pvMap').hidden) $('#pvToks').innerHTML = tokensHtml(state.pvMapData.tokens || [], { turn: state.pvTurnId }); }
@@ -3922,7 +3986,7 @@ function renderPlayerView(d) {
   const order = ti >= 0 ? [...list.keys()].slice(ti + 1).concat([...list.keys()].slice(0, ti + 1)) : [...list.keys()];
   const nextRound = (+(d && d.round) || 0) + 1;
   $('#pvList').innerHTML = order.map(i => [i, list[i]]).map(([i, c]) => (ti >= 0 && i === 0 ? `<li class="pv-round-sep" aria-hidden="true"><span>Round ${nextRound}</span></li>` : '') + `
-    <li class="pv${c.pc ? ' pc' : ' mon'}${i === ti ? ' now' : ''}${c.down ? ' down' : ''}"${i === ti ? ' aria-current="true"' : ''}>
+    <li class="pv${c.pc ? ' pc' : ' mon'}${isMine(c) ? ' mine' : ''}${i === ti ? ' now' : ''}${c.down ? ' down' : ''}"${i === ti ? ' aria-current="true"' : ''}>
       <span class="pv-pos">${i + 1}</span>
       ${isAssetId(c.img)
         ? `<button type="button" class="pv-thumb" data-zoom="${c.img}" aria-label="Show ${esc(c.name)} full size"><img src="${imgSrc(isAssetId(c.thumb) ? c.thumb : c.img)}" alt="" loading="lazy" decoding="async" width="48" height="48" data-l="${esc((c.name || '?')[0].toUpperCase())}" onerror="this.replaceWith(this.dataset.l)"></button>`
@@ -3936,12 +4000,14 @@ function renderPlayerView(d) {
   nowEl.hidden = !cur;
   if (cur) {
     const key = cur.id + '|' + (d.round || 0), nx = list[next];
-    nowEl.innerHTML = `<span class="k">Current turn${d.round ? ` · round ${+d.round}` : ''}</span>
+    nowEl.classList.toggle('mine', isMine(cur));
+    if (isMine(cur) && key !== pvNowKey && pvNowKey !== null && navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    nowEl.innerHTML = `<span class="k">${isMine(cur) ? 'Your turn!' : 'Current turn'}${d.round ? ` · round ${+d.round}` : ''}</span>
       ${isAssetId(cur.img)
         ? `<button type="button" class="pv-thumb" data-zoom="${cur.img}" aria-label="Show ${esc(cur.name)} full size"><img src="${imgSrc(isAssetId(cur.thumb) ? cur.thumb : cur.img)}" alt="" decoding="async" width="64" height="64" data-l="${esc((cur.name || '?')[0].toUpperCase())}" onerror="this.replaceWith(this.dataset.l)"></button>`
         : `<span class="pv-thumb" aria-hidden="true">${esc((cur.name || '?')[0].toUpperCase())}</span>`}
       <span class="who"><b>${esc(cur.name)}</b>${cur.pc ? '<span class="pc-tag">PC</span>' : ''}</span>
-      ${nx && nx !== cur ? `<span class="nx">Up next: <b>${esc(nx.name)}</b></span>` : ''}`;
+      ${nx && nx !== cur ? `<span class="nx${isMine(nx) ? ' mine' : ''}">${isMine(nx) ? 'You’re up next:' : 'Up next:'} <b>${esc(nx.name)}</b></span>` : ''}`;
     if (pvNowKey !== null && key !== pvNowKey) { nowEl.classList.remove('fresh'); void nowEl.offsetWidth; nowEl.classList.add('fresh'); }
     // A new turn: back to the top of the list, so whoever is up next sits right under the card.
     // Only on a turn change, so players can still scroll around freely in between.
@@ -3967,6 +4033,7 @@ function showPlayers() {
     // Website: no player code in the address means this is the front door (sign-in page), not a players' screen
     if (!SITE.linkCode()) { showLogin(); return; }
     renderPlayerView(null);
+    startJoin();
     SITE.watchPlayers(d => { reloadIfOutdated(d); renderPlayerView(d); });
     if (SITE.watchMap) SITE.watchMap(d => { reloadIfOutdated(d); setPvMap(d && d.map); });
     return;
@@ -4128,7 +4195,7 @@ function cbRow(c, current) {
     ${cbPic(c)}
     <div class="cb-main">
       <div class="cb-name"><input class="cb-nm" id="name-${c.id}" type="text" maxlength="60" size="${Math.max(3, c.name.length + 1)}" autocomplete="off" spellcheck="false" value="${esc(c.name)}" data-cb-name="${c.id}" aria-label="Name of ${esc(c.name)}" title="Tap to rename">${mon ? '' : '<span class="pc-tag">PC</span>'}${down ? '<span class="down-tag">DOWN</span>' : ''}${c.hidden ? '<span class="hide-tag">HIDDEN</span>' : ''}</div>
-      ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="text" maxlength="8" autocomplete="off" value="${c.ac != null ? esc(String(c.ac)) : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label></div>` : ''}
+      ${!mon ? `<div class="cb-sub"><label class="pc-ac">AC <input class="cb-ac" type="text" maxlength="8" autocomplete="off" value="${c.ac != null ? esc(String(c.ac)) : ''}" placeholder="—" data-cb-ac="${c.id}" aria-label="Armor Class for ${esc(c.name)}"></label>${SITE && c.heroId ? seatLabel(c.heroId) : ''}</div>` : ''}
       ${mon ? `<div class="cb-sub">AC ${c.ac} <button type="button" class="hp-pill${hpLow(c) ? ' low' : ''}" data-cb-hp="${c.id}" aria-expanded="${open}">HP ${c.hp}/${c.maxHp}</button>
         <label class="cb-hide" title="Hidden monsters don't appear on the players' screen"><input type="checkbox" data-cb-hide="${c.id}"${c.hidden ? ' checked' : ''}> Hidden</label></div>
       <div class="hp-bar"><i class="${hpLow(c) ? 'low' : ''}" style="width:${pct}%"></i></div>` : ''}
@@ -4424,6 +4491,7 @@ function startGroupInit(gid) {
 function addGroupToFight(e) {
   e.preventDefault();
   const g = state.groups.find(x => x.id === state.grpInitFor); if (!g) return;
+  if (SITE && state.tableGroup !== g.id) setTableGroup(g.id).catch(() => {});
   let added = 0, blanks = 0;
   const links = [];  // [token, combatant id], saved once the fight itself is saved
   heroesIn(g.id).forEach(p => {
@@ -4452,6 +4520,10 @@ function setSync(text, s) { const el = $('#sync'); el.textContent = text; el.dat
 function setReadOnly() { state.canWrite = false; $('#newBtn').hidden = true; renderList(); renderDetail(); }
 
 /* ---------- events ---------- */
+// website: group player links and joining
+$('#joinForm').addEventListener('submit', joinTable);
+$('#joinName').addEventListener('input', () => { $('#joinGo').disabled = joinBusy || !joinPick || !str($('#joinName').value); });
+$('#pvGroupSel').addEventListener('change', e => { state.pvGroup = e.target.value; renderTableSheet(); });
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('button'); if (!t) return;
   if (t.dataset.roll) {
@@ -4499,6 +4571,13 @@ document.addEventListener('click', async ev => {
   // maps
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
+  if (t.dataset.joinHero) { joinPick = t.dataset.joinHero; renderJoin(); return; }
+  if (t.dataset.seatFree) {
+    const g = state.groups.find(x => x.id === state.pvGroup), h = state.heroes.find(x => x.id === t.dataset.seatFree);
+    const s = g && (state.seats[g.playerCode] || []).find(x => x.heroId === t.dataset.seatFree);
+    if (g && s) showConfirm(`Free ${h ? h.name : 'this character'}? ${s.name} will pick a character again.`, 'Release', () => SITE.releaseSeat(g.playerCode, s.heroId).catch(err => toast(saveErrorText(err))));
+    return;
+  }
   if (t.dataset.lang && t.closest('.lang-seg')) { setLang(t.dataset.lang); return; }
   if (t.dataset.hgroup) { state.heroGroup = t.dataset.hgroup; ls.set('pb-hgroup', state.heroGroup); renderHeroes(); return; }
   if (t.dataset.heroedit) { openHeroDlg(state.heroes.find(h => h.id === t.dataset.heroedit)); return; }
@@ -4568,14 +4647,14 @@ document.addEventListener('click', async ev => {
     case 'turn-next': moveTurn(1); break;
     case 'send-rolls': clearTimeout(playersTimer); publishPlayers(); break;
     case 'turn-prev': moveTurn(-1); break;
-    case 'pv-reset': if (SITE) showConfirm('Make a new player link? The current link stops working; send your players the new one.', 'Reset link', async () => {
-      try { $('#pvLink').value = await SITE.resetPlayerLink(); mapSentKey = null; playersSentKey = null; schedulePlayersUpdate(0); if (state.shownMap) pushMapSoon(0); toast('New player link ready. Copy it and send it to your players.'); }
-      catch (e) { toast(saveErrorText(e)); }
-    }); break;
+    case 'pvg-reset': showConfirm('Make a new link for this group? The current one stops working and everyone joins again with the new one.', 'Reset link', resetGroupLink); break;
+    case 'pvg-copy': { const v = $('#pvGLink').value; if (!v || v === '…') break; navigator.clipboard.writeText(v).then(() => toast('Link copied'), () => { $('#pvGLink').select(); }); break; }
+    case 'pvg-table': setTableGroup(state.pvGroup).catch(err => toast(saveErrorText(err))); break;
+    case 'hg-link': openTableSheet(state.heroGroup); break;
+    case 'pv-change': changeCharacter(); break;
     case 'pv-share':
-      $('#pvLink').value = SITE ? SITE.playerLink() : PLAYER_URL;
-      $('#pvReset').hidden = !SITE;
-      if (SITE) $('#pvSteps').innerHTML = '<li>Send players the link below. It belongs to your account, and they don’t need one.</li><li>Their screen changes by itself the moment you press <b>Start</b>, <b>Next</b> or <b>Prev</b>, or roll from a monster’s stat block.</li><li><b>Reset link</b> makes a new one; the old link stops working.</li>';
+      if (SITE) { openTableSheet(); break; }
+      $('#pvLink').value = PLAYER_URL; $('#pvReset').hidden = true;
       $('#pvSheet').hidden = false; break;
     case 'folder-new': openFolderDlg(null); break;
     case 'folder-edit': { const f = state.mapFolders.find(x => x.id === state.mapFolder); if (f) openFolderDlg(f); break; }
@@ -5556,6 +5635,7 @@ function publicMap() {
 let viewPushT = null;
 function viewPushSoon() { if (!SITE || viewPushT) return; viewPushT = setTimeout(() => { viewPushT = null; pushMapSoon(0); }, 250); }
 function pushMapSoon(delay = 300) {
+  if (SITE && !SITE.tableCode()) return;
   if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
   clearTimeout(mapPushT);
   mapPushT = setTimeout(async () => {
@@ -5839,6 +5919,165 @@ function checkMapScreen() {
   if (k !== mapSentKey) { mapSentKey = k; pushMapSoon(150); }
 }
 
+/* ---------- website: each group has its own player link ----------
+   groups/<id>.playerCode → play/<code>. Players open …#players/<code>, type their name and take one of the group's
+   heroes (play/<code>/seats/<heroId>, one player per hero). The group at the table (settings/table) is the one whose
+   screens get the turn order and the map; the others wait. play/<code>/state/roster lists the group's heroes. */
+state.tableGroup = null; state.seats = {}; state.pvGroup = null; state.me = null;
+const seatSubs = {};
+const tableG = () => state.groups.find(g => g.id === state.tableGroup) || null;
+const seatOnline = s => !!s && Date.now() - (s.seen || 0) < 150000;
+function seatFor(heroId) { const g = tableG(); return g && g.playerCode ? (state.seats[g.playerCode] || []).find(s => s.heroId === heroId) : null; }
+function applyTable() { if (!SITE) return; const g = tableG(); SITE.setTable(g && g.playerCode ? g.playerCode : null); paintSeats(); }
+async function ensureGroupCode(g) {
+  if (g.playerCode) return g.playerCode;
+  const code = await SITE.makeGroupCode(g.id);
+  g.playerCode = code;
+  await state.db.collection('groups').doc(g.id).update({ playerCode: code });
+  syncSeatSubs(); checkRosters();
+  return code;
+}
+function syncSeatSubs() {
+  if (!SITE || state.role !== 'dm') return;
+  const codes = new Set(state.groups.map(g => g.playerCode).filter(Boolean));
+  for (const c of Object.keys(seatSubs)) if (!codes.has(c)) { seatSubs[c](); delete seatSubs[c]; delete state.seats[c]; }
+  for (const c of codes) if (!seatSubs[c]) seatSubs[c] = SITE.watchSeats(c, list => { state.seats[c] = list; paintSeats(); if (!$('#pvSheet').hidden) renderTableSheet(); });
+}
+// the player's name (and whether they're online) beside each hero in the fight; later changes update it in place,
+// so typing in the fight isn't disturbed
+function seatLabel(heroId) {
+  const s = seatFor(heroId);
+  return `<span class="cb-player no-tr${seatOnline(s) ? ' on' : ''}" data-seat-hero="${esc(heroId)}"${s ? ` title="${seatOnline(s) ? 'Online' : 'Not online right now'}"` : ' hidden'}>${s ? esc(s.name) : ''}</span>`;
+}
+function paintSeats() {
+  document.querySelectorAll('[data-seat-hero]').forEach(el => {
+    const s = seatFor(el.dataset.seatHero);
+    el.hidden = !s; el.textContent = s ? s.name : ''; el.classList.toggle('on', seatOnline(s));
+    el.title = s ? (seatOnline(s) ? 'Online' : 'Not online right now') : '';
+  });
+}
+async function setTableGroup(gid, quiet) {
+  const g = state.groups.find(x => x.id === gid); if (!g || !SITE || !state.db) return;
+  const old = tableG();
+  const code = await ensureGroupCode(g);
+  if (old && old.playerCode && old.id !== g.id) SITE.clearPlay(old.playerCode);  // their screens go back to waiting
+  state.tableGroup = g.id; SITE.setTable(code);
+  try { await state.db.doc('settings/table').set({ groupId: g.id, at: Date.now() }); } catch {}
+  schedulePlayersUpdate(0); if (state.shownMap) pushMapSoon(0);
+  paintSeats(); if (!$('#pvSheet').hidden) renderTableSheet();
+  if (!quiet) toast(`${g.name} is at the table`);
+}
+// what the join screen shows: the group's heroes
+let rosterKeys = {};
+function checkRosters() {
+  if (!SITE || state.role !== 'dm' || !state.canWrite || !state.db || !state.loaded || !heroesLoaded || !groupsLoaded) return;
+  for (const g of state.groups) {
+    if (!g.playerCode) continue;
+    const data = { group: g.name, color: g.color, lang: LANG,
+      heroes: heroesIn(g.id).sort((a, b) => a.name.localeCompare(b.name)).map(h => ({ id: h.id, name: h.name, img: h.image || '', thumb: h.thumb || '' })) };
+    const k = JSON.stringify(data); if (rosterKeys[g.playerCode] === k) continue;
+    rosterKeys[g.playerCode] = k;
+    const code = g.playerCode;
+    SITE.writePlay(code, 'roster', { ...data, at: Date.now(), build: APP_BUILD }).catch(() => { delete rosterKeys[code]; });
+  }
+}
+/* The Players panel (website): pick a group, its link, who joined, and whether it's at the table. */
+function renderTableSheet() {
+  const gs = sortedGroups();
+  $('#pvNoGroups').hidden = gs.length > 0; $('#pvGroupBox').hidden = !gs.length;
+  if (!gs.length) return;
+  if (!gs.some(g => g.id === state.pvGroup)) state.pvGroup = gs.some(g => g.id === state.tableGroup) ? state.tableGroup : gs[0].id;
+  const g = gs.find(x => x.id === state.pvGroup), at = g.id === state.tableGroup;
+  $('#pvGroupSel').innerHTML = gs.map(x => `<option value="${esc(x.id)}"${x.id === g.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('');
+  $('#pvAtTable').hidden = !at; $('#pvNotTable').hidden = at;
+  $('#pvGLink').value = g.playerCode ? SITE.groupLink(g.playerCode) : '…';
+  if (!g.playerCode && state.canWrite) ensureGroupCode(g).then(() => { if (!$('#pvSheet').hidden) renderTableSheet(); }, err => toast(saveErrorText(err)));
+  const seats = state.seats[g.playerCode] || [], hs = heroesIn(g.id).sort((a, b) => a.name.localeCompare(b.name));
+  $('#seatList').innerHTML = hs.length ? hs.map(h => {
+    const s = seats.find(x => x.heroId === h.id);
+    return `<li>${heroAv(h)}<span class="seat-txt"><b>${esc(h.name)}</b>${s ? `<span class="seat-who${seatOnline(s) ? ' on' : ''}"><span class="no-tr">${esc(s.name)}</span> · <span>${seatOnline(s) ? 'online' : 'offline'}</span></span>` : '<span class="seat-free">Free</span>'}</span>`
+      + (s && state.canWrite ? `<button type="button" class="btn small ghost" data-seat-free="${esc(h.id)}">Release</button>` : '') + '</li>';
+  }).join('') : '<li class="hint">This group has no heroes yet. Add them in the Heroes tab.</li>';
+}
+function openTableSheet(gid) {
+  if (gid) state.pvGroup = gid;
+  $('#pvSite').hidden = false; $('#pvLinkField').hidden = true;
+  $('#pvSteps').innerHTML = '<li>Each group has its own link. Players open it, type their name and pick their character.</li><li>Only the group at the table sees your fight and the map you show. Adding a group to the fight puts it at the table.</li>';
+  renderTableSheet(); $('#pvSheet').hidden = false;
+}
+async function resetGroupLink() {
+  const g = state.groups.find(x => x.id === state.pvGroup); if (!g || !g.playerCode) return;
+  const old = g.playerCode;
+  try {
+    g.playerCode = ''; await state.db.collection('groups').doc(g.id).update({ playerCode: '' });
+    await ensureGroupCode(g); SITE.dropGroupCode(old);
+    if (state.tableGroup === g.id) { SITE.setTable(g.playerCode); schedulePlayersUpdate(0); if (state.shownMap) pushMapSoon(0); }
+    renderTableSheet(); toast('New link ready. Send it to the group; the old one stopped working.');
+  } catch (err) { toast(saveErrorText(err)); }
+}
+
+/* --- the player's side: join with a name and a hero, then "your turn" on their screen --- */
+let joinRoster, joinSeats, joinPick = null, joinBusy = false;
+async function startJoin() {
+  const code = SITE.linkCode();
+  const uid = await SITE.playerAuth();
+  if (!uid) { joinRoster = null; joinSeats = []; renderJoin('Couldn’t connect to join the table. Reload to try again.'); return; }
+  SITE.watchRoster(r => { joinRoster = r; if (r && r.lang && r.lang !== LANG) setLang(r.lang, false); renderJoin(); });
+  SITE.watchSeats(code, s => { joinSeats = s; renderJoin(); });
+  setInterval(seatHeartbeat, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') seatHeartbeat(); });
+}
+function seatHeartbeat() { if (state.me) SITE.seatSeen(SITE.linkCode(), state.me.heroId).catch(() => {}); }
+function renderJoin(err) {
+  if (!err && (joinRoster === undefined || joinSeats === undefined)) return;  // wait for both
+  const view = $('#joinView'), code = SITE.linkCode(), uid = SITE.myUid();
+  const mine = (joinSeats || []).find(s => s.uid === uid);
+  const heroes = (joinRoster && joinRoster.heroes) || [];
+  const hero = mine && heroes.find(h => h.id === mine.heroId);
+  const before = state.me ? state.me.heroId : null;
+  state.me = mine ? { heroId: mine.heroId, name: mine.name, hero: hero ? hero.name : '' } : null;
+  const now = state.me ? state.me.heroId : null;
+  if (now && now !== before) seatHeartbeat();
+  $('#pvMe').hidden = !state.me;
+  if (state.me) { $('#pvMeName').textContent = state.me.name; $('#pvMeHero').textContent = state.me.hero || '—'; }
+  if (now !== before) renderPlayerView(state.pvLast || null);
+  view.hidden = !!state.me;
+  if (state.me) return;
+  const gone = !joinRoster || !!err;
+  $('#joinGroup').textContent = joinRoster ? joinRoster.group : '';
+  $('#joinForm').hidden = gone; $('#joinGone').hidden = !gone;
+  if (gone) { $('#joinGone').textContent = err || 'This player link doesn’t work any more. Ask your GM for the new one.'; return; }
+  const nm = $('#joinName');
+  if (!nm.value) { const saved = ls.get('pb-seat-' + code, null); if (saved && saved.name) nm.value = saved.name; }
+  if (joinPick && (!heroes.some(h => h.id === joinPick) || (joinSeats || []).some(s => s.heroId === joinPick && s.uid !== uid))) joinPick = null;
+  $('#joinHeroes').innerHTML = heroes.length ? heroes.map(h => {
+    const s = (joinSeats || []).find(x => x.heroId === h.id && x.uid !== uid);
+    return `<li><button type="button" class="join-hero" data-join-hero="${esc(h.id)}" aria-pressed="${joinPick === h.id}"${s ? ' disabled' : ''}>`
+      + `<span class="avatar big">${isAssetId(h.img) ? `<img src="${imgSrc(isAssetId(h.thumb) ? h.thumb : h.img)}" alt="" loading="lazy" decoding="async">` : esc((h.name || '?')[0].toUpperCase())}</span>`
+      + `<b>${esc(h.name)}</b>${s ? `<span class="join-taken"><span>Taken by</span> <span class="no-tr">${esc(s.name)}</span></span>` : ''}</button></li>`;
+  }).join('') : '<li class="hint">Your GM hasn’t added any characters to this group yet.</li>';
+  $('#joinGo').disabled = joinBusy || !joinPick || !str(nm.value);
+}
+async function joinTable(e) {
+  e.preventDefault();
+  const code = SITE.linkCode(), name = str($('#joinName').value).slice(0, 40);
+  if (!name || !joinPick || joinBusy) return;
+  joinBusy = true; renderJoin();
+  try {
+    const uid = SITE.myUid();
+    for (const s of (joinSeats || []).filter(x => x.uid === uid && x.heroId !== joinPick)) { try { await SITE.releaseSeat(code, s.heroId); } catch {} }
+    await SITE.takeSeat(code, joinPick, name);
+    ls.set('pb-seat-' + code, { heroId: joinPick, name });
+  } catch { toast('Someone took that character first. Pick another one.'); joinPick = null; }
+  joinBusy = false; renderJoin();
+}
+async function changeCharacter() {
+  if (!state.me) return;
+  const code = SITE.linkCode(), id = state.me.heroId;
+  joinPick = null;
+  try { await SITE.releaseSeat(code, id); } catch { toast('Couldn’t leave that character. Try again.'); }
+}
+
 /* ---------- heroes ----------
    The player-character registry: heroes/<id> = {name, ac, image, thumb, tokenId, groupIds}. Groups are the
    groups/<id> docs (now just {name, color}); a hero can be in several, like a monster in several books.
@@ -5860,7 +6099,7 @@ function renderHeroes() {
     + (state.canWrite ? `<button type="button" class="book book-new" data-act="hg-new">+ New group</button>` : '');
   const g = state.groups.find(x => x.id === state.heroGroup), bar = $('#heroGroupBar');
   bar.hidden = !g;
-  bar.innerHTML = g ? `<b>${esc(g.name)}</b><span>${heroesIn(g.id).length} heroes</span><span class="spacer"></span>${state.canWrite ? '<button type="button" class="btn small ghost" data-act="hg-edit">Edit group</button>' : ''}` : '';
+  bar.innerHTML = g ? `<b>${esc(g.name)}</b><span>${heroesIn(g.id).length} heroes</span><span class="spacer"></span>${SITE ? '<button type="button" class="btn small ghost" data-act="hg-link">Player link</button>' : ''}${state.canWrite ? '<button type="button" class="btn small ghost" data-act="hg-edit">Edit group</button>' : ''}` : '';
   const q = state.heroQ.toLowerCase();
   const list = (g ? heroesIn(g.id) : state.heroes).filter(h => !q || h.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
   $('#heroList').innerHTML = list.map(h => {
@@ -5969,7 +6208,7 @@ async function saveHg(ev) {
   if (!state.db) { showErr('#hgErr', 'Not connected, so the group can’t be saved right now.'); return; }
   const old = e.id ? state.groups.find(g => g.id === e.id) : null;
   const ref = old ? state.db.collection('groups').doc(old.id) : state.db.collection('groups').doc();
-  const data = { name, color: e.color, players: [], createdAt: old ? old.createdAt || Date.now() : Date.now() };
+  const data = { name, color: e.color, players: [], createdAt: old ? old.createdAt || Date.now() : Date.now(), ...(old && old.playerCode ? { playerCode: old.playerCode } : {}) };
   try {
     await ref.set(data);
     state.groups = [...state.groups.filter(g => g.id !== ref.id), { ...data, id: ref.id }];
@@ -5985,6 +6224,7 @@ function deleteHg() {
     try {
       await state.db.collection('groups').doc(g.id).delete();
       state.groups = state.groups.filter(x => x.id !== g.id);
+      if (SITE && g.playerCode) { SITE.dropGroupCode(g.playerCode); if (state.tableGroup === g.id) { state.tableGroup = null; SITE.setTable(null); try { await state.db.doc('settings/table').delete(); } catch {} } }
       for (const h of heroesIn(g.id)) { h.groupIds = h.groupIds.filter(x => x !== g.id); try { await state.db.collection('heroes').doc(h.id).update({ groupIds: h.groupIds }); } catch {} }
       state.hgEd = null; $('#hgSheet').hidden = true; state.heroGroup = 'all';
       renderHeroes(); toast(`Deleted “${g.name}”`);
@@ -6059,6 +6299,21 @@ function setupFullscreen() {
    a whole piece of text that matches the table, so monsters, names and notes you typed are left alone.
    The DM's choice also goes to the players' screens. */
 const PT = {
+  "Make a group in the Heroes tab first: each group gets its own player link.": "Crie um grupo na aba Heróis primeiro: cada grupo tem o próprio link dos jogadores.",
+  "Group": "Grupo", "At the table.": "Na mesa.", "Their screens show your fight and the map you show.": "As telas deles mostram seu combate e o mapa que você mostrar.",
+  "Not at the table: their screens wait.": "Fora da mesa: as telas deles ficam esperando.", "Put at the table": "Colocar na mesa", "This group’s player link": "Link dos jogadores deste grupo",
+  "Who joined": "Quem entrou", "online": "online", "offline": "offline", "Free": "Livre", "Release": "Liberar", "Player link": "Link dos jogadores", "Online": "Online", "Not online right now": "Não está online agora",
+  "This group has no heroes yet. Add them in the Heroes tab.": "Este grupo ainda não tem heróis. Adicione-os na aba Heróis.",
+  "Each group has its own link. Players open it, type their name and pick their character.": "Cada grupo tem o próprio link. Os jogadores abrem, digitam o nome e escolhem o personagem.",
+  "Only the group at the table sees your fight and the map you show. Adding a group to the fight puts it at the table.": "Só o grupo na mesa vê seu combate e o mapa que você mostrar. Adicionar um grupo ao combate coloca ele na mesa.",
+  "Make a new link for this group? The current one stops working and everyone joins again with the new one.": "Criar um novo link para este grupo? O atual para de funcionar e todos entram de novo pelo novo.",
+  "New link ready. Send it to the group; the old one stopped working.": "Novo link pronto. Envie ao grupo; o antigo parou de funcionar.",
+  "Join the table": "Entrar na mesa", "Your name": "Seu nome", "e.g. Ana": "ex.: Ana", "Your character": "Seu personagem", "Join": "Entrar", "Taken by": "Escolhido por",
+  "playing": "jogando com", "Change character": "Trocar personagem", "Your turn!": "Sua vez!", "You’re up next:": "Você é o próximo:",
+  "This player link doesn’t work any more. Ask your GM for the new one.": "Este link dos jogadores não funciona mais. Peça o novo ao mestre.",
+  "Couldn’t connect to join the table. Reload to try again.": "Não foi possível conectar para entrar na mesa. Recarregue para tentar de novo.",
+  "Your GM hasn’t added any characters to this group yet.": "O mestre ainda não adicionou personagens a este grupo.",
+  "Someone took that character first. Pick another one.": "Alguém escolheu esse personagem antes. Escolha outro.", "Couldn’t leave that character. Try again.": "Não foi possível sair desse personagem. Tente de novo.",
   "Remove": "Remover", "Admin page": "Página de administração", "Access, invite links, storage and sign-in history": "Acessos, links de convite, armazenamento e histórico de entradas",
   "Bestiary, initiative, maps and tokens for your table.": "Bestiário, iniciativa, mapas e tokens para a sua mesa.",
   "You’ve been invited to be a GM. Sign in with the Google account you want to use.": "Você foi convidado para ser mestre. Entre com a conta Google que quer usar.",
@@ -6292,6 +6547,8 @@ const ptType = t => PT_TYPE[t.toLowerCase()] || t;
 const PT_SENSE = { darkvision: 'visão no escuro', blindsight: 'percepção às cegas', tremorsense: 'sentido sísmico', truesight: 'visão verdadeira', 'passive Perception': 'Percepção passiva' };
 // Text with numbers or names in it.
 const PT_RX = [
+  [/^(.+) is at the table$/, '$1 está na mesa'], [/^Your turn! · round (\d+)$/, 'Sua vez! · rodada $1'],
+  [/^Free (.+)\? (.+) will pick a character again\.$/, 'Liberar $1? $2 vai escolher um personagem de novo.'],
   [/^(.+) isn’t a GM here. Ask the toolbox owner for an invite link.$/, '$1 não é de mestre aqui. Peça um link de convite ao dono da ferramenta.'],
   [/^(\d+) monsters?$/, (m, n) => `${n} monstro${n == 1 ? '' : 's'}`], [/^(\d+) heroes$/, (m, n) => `${n} heróis`], [/^(\d+) hero(es)?$/, (m, n) => `${n} herói${n == 1 ? '' : 's'}`],
   [/^(\d+) maps?$/, (m, n) => `${n} mapa${n == 1 ? '' : 's'}`], [/^Round (\d+)$/, 'Rodada $1'], [/^Current turn · round (\d+)$/, 'Turno atual · rodada $1'],
@@ -6424,9 +6681,11 @@ async function connect() {
   }
   setSync('Syncing…', 'idle');
   encSubscribe(db);
+  if (SITE) db.doc('settings/table').onSnapshot(s => { const gid = s.exists ? s.data().groupId || null : null; if (gid !== state.tableGroup) { state.tableGroup = gid; applyTable(); playersSentKey = null; mapSentKey = null; if (!document.getElementById('pvSheet').hidden) renderTableSheet(); } }, () => {});
   db.collection('groups').onSnapshot(snap => {
-    state.groups = snap.docs.map(d => { const g = d.data(); return { id: d.id, name: str(g.name) || 'Group', color: BOOK_COLORS[g.color] ? g.color : 'navy', players: cleanPlayers(g.players), createdAt: g.createdAt }; });
+    state.groups = snap.docs.map(d => { const g = d.data(); return { id: d.id, name: str(g.name) || 'Group', color: BOOK_COLORS[g.color] ? g.color : 'navy', players: cleanPlayers(g.players), createdAt: g.createdAt, playerCode: typeof g.playerCode === 'string' ? g.playerCode : '' }; });
     ls.set('pb-groups', state.groups);
+    if (SITE) { applyTable(); syncSeatSubs(); }
     if (!$('#grpSheet').hidden && state.grpViewName === 'list') renderGroups();
     if ($('#app').dataset.tab === 'heroes') renderHeroes();
     groupsLoaded = true; migrateGroupPlayers();
@@ -6501,7 +6760,7 @@ state.shownMap = ls.get('pb-shown-map', null);
 setTab(['init', 'maps', 'tokens', 'heroes'].includes(ls.get('pb-tab', 'bestiary')) ? ls.get('pb-tab', 'bestiary') : 'bestiary');
 renderEncounter();
 setupFullscreen();
-if (SITE) setInterval(() => { checkPlayersScreen(); checkMapScreen(); }, 1000);
+if (SITE) { setInterval(() => { checkPlayersScreen(); checkMapScreen(); checkRosters(); }, 1000); setInterval(() => { paintSeats(); if (!document.getElementById('pvSheet').hidden && state.role === 'dm') renderTableSheet(); }, 30000); }
 if (!playerLink) restoreScreen();
 if (playerLink) showPlayers(); else connect();
 })();
