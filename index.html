@@ -36,20 +36,21 @@
   --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
   --radius: 10px;
+  --side-pc: #2f6fd0; --side-mon: #c0392b;  /* initiative: players blue, monsters red */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299;
     --line: #2c332e; --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f;
-    --good: #6cc490; --bad: #f08a6a; color-scheme: dark;
+    --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e;
   }
 }
 :root[data-theme="light"] { color-scheme: only light; }
 :root[data-theme="dark"] {
   --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299;
   --line: #2c332e; --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f;
-  --good: #6cc490; --bad: #f08a6a; color-scheme: dark;
+  --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e;
 }
 [hidden] { display: none !important; }
 html { box-sizing: border-box; height: 100%; background: var(--bg); }  /* also fills the notch / safe-area edges on phones */
@@ -503,6 +504,12 @@ button.cb-pic { cursor: zoom-in; }
 /* Hidden monsters: in the DM's tracker only */
 .hide-tag { font-size: .7rem; font-weight: 700; letter-spacing: .06em; padding: 1px 6px; border-radius: 999px; vertical-align: 2px; margin-left: 4px; background: var(--ink); color: var(--bg); }
 .cb.hidden-mon { border-style: dashed; border-color: var(--muted); }
+/* Players blue, monsters red: a stripe on the left and a soft tint. The current turn gets a ring around the row. */
+.cb.pc, .pv.pc { --side: var(--side-pc); }
+.cb.mon, .pv.mon { --side: var(--side-mon); }
+.cb.pc, .cb.mon, .pv.pc, .pv.mon { box-shadow: inset 6px 0 0 var(--side); background: color-mix(in srgb, var(--side) 9%, var(--surface)); }
+.cb.current, .pv.now { border-color: var(--accent); box-shadow: inset 6px 0 0 var(--side, var(--accent)), 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--side, var(--accent)) 20%, var(--surface)); }
+.cb.hidden-mon { border-color: var(--muted); }
 .cb-hide { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 4px; font-size: .84rem; color: var(--muted); cursor: pointer; }
 .cb-hide input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .pick-opts { margin: 0 0 6px; }
@@ -1524,7 +1531,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261121-142108';
+const APP_BUILD = '20261123-124550';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3731,7 +3738,7 @@ function renderPlayerView(d) {
       <span class="tot${r.crit === 'crit' ? ' crit' : r.crit === 'fumble' ? ' fumble' : ''}">${+r.total}${r.crit === 'crit' ? ' ★' : ''}</span>
     </li>`).join('');
   $('#pvList').innerHTML = list.map((c, i) => `
-    <li class="pv${i === ti ? ' now' : ''}${c.down ? ' down' : ''}"${i === ti ? ' aria-current="true"' : ''}>
+    <li class="pv${c.pc ? ' pc' : ' mon'}${i === ti ? ' now' : ''}${c.down ? ' down' : ''}"${i === ti ? ' aria-current="true"' : ''}>
       <span class="pv-pos">${i + 1}</span>
       ${isAssetId(c.img)
         ? `<button type="button" class="pv-thumb" data-zoom="${c.img}" aria-label="Show ${esc(c.name)} full size"><img src="${imgSrc(isAssetId(c.thumb) ? c.thumb : c.img)}" alt="" loading="lazy" decoding="async" width="48" height="48" data-l="${esc((c.name || '?')[0].toUpperCase())}" onerror="this.replaceWith(this.dataset.l)"></button>`
@@ -3902,7 +3909,7 @@ function cbPic(c) {
 function cbRow(c, current) {
   const mon = c.kind === 'monster', down = mon && c.hp <= 0, open = state.hpOpen === c.id;
   const pct = mon ? Math.max(0, Math.min(100, c.hp / c.maxHp * 100)) : 0;
-  return `<li class="cb${current ? ' current' : ''}${down ? ' down' : ''}${c.hidden ? ' hidden-mon' : ''}" data-cb="${c.id}"${current ? ' aria-current="true"' : ''}>
+  return `<li class="cb${mon ? ' mon' : ' pc'}${current ? ' current' : ''}${down ? ' down' : ''}${c.hidden ? ' hidden-mon' : ''}" data-cb="${c.id}"${current ? ' aria-current="true"' : ''}>
     <input class="cb-init" id="init-${c.id}" type="number" value="${c.init}" data-cb-init="${c.id}" aria-label="Initiative for ${esc(c.name)}">
     ${cbPic(c)}
     <div class="cb-main">
