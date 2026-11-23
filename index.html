@@ -378,7 +378,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv.now { border-color: var(--accent); box-shadow: inset 5px 0 0 var(--accent); background: var(--accent-soft); font-size: 1.3rem; padding-block: 16px; }
 .pv.down .pv-name { text-decoration: line-through; color: var(--muted); }
 .pv-tag { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--turn); color: var(--turn-ink); }
-.pv-tag.soft { background: var(--sunk); color: var(--muted); }
+.pv-tag.soft { background: #f2c53d; color: #2a2100; }  /* "Up next": yellow, easy to spot in light and dark */
 .app[data-role="player"] .tray { display: none; }
 .pv-rolls h3 { font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 8px 0 8px; }
 .pv-rolls ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -1629,7 +1629,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-143031';
+const APP_BUILD = '20261123-143332';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
