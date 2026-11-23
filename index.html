@@ -655,7 +655,7 @@ button.cb-pic { cursor: zoom-in; }
 .fog-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fog-tools { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fog-tools[hidden] { display: none; }
-#fogToggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#fogToggle[aria-pressed="true"], #mapSyncBtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .map-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 4px 10px; border-bottom: 1px solid var(--line); }
 .map-colors { display: flex; gap: 5px; flex-wrap: wrap; }
 .map-colors button { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); background: var(--sw); box-shadow: 0 0 0 1px var(--line); }
@@ -860,6 +860,7 @@ button.cb-pic { cursor: zoom-in; }
           </div>
           <button type="button" class="btn small ghost" data-act="map-undo" id="mapUndo" disabled>↶ Undo</button>
           <button type="button" class="btn small ghost" data-act="map-fit">Fit</button>
+          <button type="button" class="btn small" data-act="map-sync" id="mapSyncBtn" aria-pressed="false" title="Players' map follows your zoom and position while it's on their screen">Sync view: off</button>
           <button type="button" class="btn small" data-act="map-add-token" title="Put a token on the map (drag it with the Move tool)">+ Token</button>
           <div class="tok-bar" id="tokBar" hidden>
             <span class="tok-bar-nm" id="tokBarName"></span>
@@ -1539,7 +1540,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-131540';
+const APP_BUILD = '20261123-132402';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -4383,6 +4384,8 @@ document.addEventListener('click', async ev => {
     case 'map-send': sendMapToPlayers(); break;
     case 'map-stop': stopShowingMap(); break;
     case 'map-undo': undoMarks(); break;
+    case 'map-sync': state.mapSync = !state.mapSync; ls.set('pb-map-sync', state.mapSync); renderMapWork(); if (state.shownMap) pushMapSoon(0);
+      toast(state.mapSync ? 'Sync view is on: players see what you see while this map is on their screen.' : 'Sync view is off: players move the map themselves.'); break;
     case 'map-add-token': openTokPick(); break;
     case 'tok-pick-close': $('#tokPickSheet').hidden = true; break;
     case 'tok-remove': { const id = state.selTok; state.selTok = null; changeTokens(list => list.filter(x => x.id !== id)); break; }
@@ -4693,7 +4696,7 @@ $('#siteImportFile').addEventListener('change', e => importFile(e.target.files &
 // The map shown to players goes out as public/map on the website (live) and inside the player page on claude.ai.
 const MAP_COLORS = ['#e2463a', '#f0a020', '#f5e04a', '#3fae5a', '#2f8fd8', '#8e5bd8', '#ffffff', '#111111'];
 Object.assign(state, {
-  maps: [], mapFolders: [], mapFolder: 'all', mapId: null, mapTool: 'move', mapColor: '#e2463a', mapSize: 'm', mapVis: 'all',
+  maps: [], mapFolders: [], mapFolder: 'all', mapId: null, mapTool: 'move', mapSync: !!ls.get('pb-map-sync', false), mapColor: '#e2463a', mapSize: 'm', mapVis: 'all',
   mapUndo: [], shownMap: null, folderEditing: null, folderColor: 'oxblood', markEditing: null, markVis: 'all',
   pvTab: 'init', pvMapData: null
 });
@@ -4875,7 +4878,14 @@ async function addMapFromFile(file) {
 /* --- the viewer: pan with a drag, zoom with the wheel or a pinch (shared by the DM and the players) --- */
 function makeViewer(stage, canvas) {
   const v = { s: 1, x: 0, y: 0, w: 1, h: 1, fitS: 1, pts: new Map(), pinch: null, drag: null, tool: null, onTap: null };
-  v.apply = () => { canvas.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`; };
+  v.apply = () => { canvas.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`; if (v.onChange) v.onChange(); };
+  // What part of the map is on screen: centre and size, in map pixels (sent to players by "Sync view").
+  v.getView = () => { const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return v.lastView || null;  // hidden: keep the last one
+    return v.lastView = { cx: Math.round((r.width / 2 - v.x) / v.s), cy: Math.round((r.height / 2 - v.y) / v.s), vw: Math.round(r.width / v.s), vh: Math.round(r.height / v.s) }; };
+  // Show that same part of the map here: same centre, zoomed so all of it fits this screen.
+  v.applyView = vw => { const r = stage.getBoundingClientRect(); if (!r.width || !r.height || !vw || !vw.vw) return;
+    const s = Math.max(v.fitS * 0.5, Math.min(v.fitS * 12, Math.min(r.width / vw.vw, r.height / vw.vh)));
+    v.s = s; v.x = r.width / 2 - vw.cx * s; v.y = r.height / 2 - vw.cy * s; v.apply(); };
   v.size = (w, h) => { v.w = w; v.h = h; canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; };
   v.fit = () => {
     const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return;
@@ -4946,14 +4956,14 @@ function makeViewer(stage, canvas) {
     v.drag = null;
   };
   stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
-  new ResizeObserver(() => { if (v.w > 1 && Math.abs(v.s - v.fitS) < 1e-6) v.fit(); }).observe(stage);
+  new ResizeObserver(() => { if (v.w <= 1) return; if (v.follow) { const r = stage.getBoundingClientRect(); v.fitS = Math.min(r.width / v.w, r.height / v.h); v.applyView(v.follow); } else if (Math.abs(v.s - v.fitS) < 1e-6) v.fit(); }).observe(stage);
   return v;
 }
 /* Show a map in a viewer: swap the picture only when it changes, then fit it. */
 function loadMapInto(v, imgEl, svgEl, m) {
   if (imgEl.dataset.id !== m.image) {
     imgEl.dataset.id = m.image;
-    imgEl.onload = () => { v.size(m.w || imgEl.naturalWidth, m.h || imgEl.naturalHeight); v.fit(); };
+    imgEl.onload = () => { v.size(m.w || imgEl.naturalWidth, m.h || imgEl.naturalHeight); v.fit(); if (v.follow) v.applyView(v.follow); };
     v.size(m.w || 1000, m.h || 1000); v.fit();
     imgEl.src = imgSrc(m.image);
   }
@@ -5024,6 +5034,7 @@ function renderMapWork() {
   $('#mapUndo').disabled = !state.mapUndo.length;
   const fogOn = !!(m.fog && m.fog.on);
   if (!fogOn && /^(reveal|hide)-/.test(state.mapTool)) state.mapTool = 'move';  // fog tools only while fog is on
+  $('#mapSyncBtn').setAttribute('aria-pressed', String(!!state.mapSync)); $('#mapSyncBtn').textContent = state.mapSync ? 'Sync view: on' : 'Sync view: off';
   $('#fogToggle').setAttribute('aria-pressed', String(fogOn));
   $('#fogToggle').textContent = fogOn ? 'Fog: on' : 'Fog: off';
   $('#fogTools').hidden = !fogOn;
@@ -5031,6 +5042,8 @@ function renderMapWork() {
   $('#mapStage').classList.toggle('drawing', state.mapTool !== 'move');
   if (!dmViewer) {
     dmViewer = makeViewer($('#mapStage'), $('#mapCanvas')); dmViewer.tool = dmTool(); dmViewer.onTap = pt => { if (state.selTok) { state.selTok = null; drawDmTokens(); } editMarkAt(pt); };
+    // Sync view: each pan/zoom goes to the players (a few times a second at most) while this map is on their screen.
+    dmViewer.onChange = () => { if (state.mapSync && state.shownMap && state.shownMap.id === state.mapId) viewPushSoon(); };
     // Polygon fog tool: a line follows the pointer; double-click or Enter closes the shape, Esc cancels it.
     $('#mapStage').addEventListener('pointermove', e => { if (!e.buttons) dmViewer.tool.hover(e); });
     $('#mapStage').addEventListener('dblclick', () => dmViewer.tool.finishPoly());
@@ -5295,8 +5308,12 @@ function publicMap() {
     fog: m.fog && m.fog.on ? m.fog : null,
     // tokens: not ones linked to a hidden monster, and not ones under fog
     tokens: resolveTokens(m).filter(t => !t.hidden && !isFogged(m, t)).map(({ hidden, ...t }) => t),
+    // "Sync view": the part of the map the DM is looking at, so players see the same (only while the DM has this map open)
+    view: state.mapSync && dmViewer && state.mapId === m.id && $('#mapsView').dataset.mview === 'map' ? dmViewer.getView() : null,
     sentAt: state.shownMap.sentAt };
 }
+let viewPushT = null;
+function viewPushSoon() { if (!SITE || viewPushT) return; viewPushT = setTimeout(() => { viewPushT = null; pushMapSoon(0); }, 250); }
 function pushMapSoon(delay = 300) {
   if (!SITE || !state.db || !state.canWrite) return;  // claude.ai: the map goes out with the player page (Send, Next, rolls…)
   clearTimeout(mapPushT);
@@ -5364,7 +5381,9 @@ function renderPvTab() {
   loadMapInto(pvViewer, $('#pvMapImg'), $('#pvSvg'), m);
   $('#pvSvg').innerHTML = marksSvg(m, m.marks || [], false) + fogSvg(m, false, 'pv');  // fog on top: it hides marks too
   $('#pvToks').innerHTML = tokensHtml(m.tokens || [], { turn: state.pvTurnId });
-  requestAnimationFrame(() => { if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
+  // Following the DM's view ("Sync view") or, if not, keep fitting the map until the player zooms in.
+  pvViewer.follow = m.view && m.view.vw ? m.view : null;
+  requestAnimationFrame(() => { if (pvViewer.follow) pvViewer.applyView(pvViewer.follow); else if (Math.abs(pvViewer.s - pvViewer.fitS) < 1e-6 || pvViewer.w <= 1) pvViewer.fit(); });
 }
 
 /* ---------- tokens ----------
