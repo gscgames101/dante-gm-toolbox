@@ -597,6 +597,8 @@ button.cb-pic { cursor: zoom-in; }
 .switch[aria-checked="true"] { background: var(--accent); }
 .switch[aria-checked="true"] span { transform: translateX(22px); }
 .fs-seg { display: grid; grid-template-columns: repeat(3, 1fr); }
+.lang-seg { display: grid; grid-template-columns: 1fr 1fr; }
+.lang-seg button { min-height: 42px; font-size: .9rem; }
 .fs-seg button { min-height: 42px; font-size: .9rem; }
 @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
 /* Small dialogs always sit above full-screen sheets. */
@@ -1230,6 +1232,13 @@ button.cb-pic { cursor: zoom-in; }
         <button type="button" class="switch" role="switch" id="darkSwitch" aria-checked="false" aria-labelledby="darkLbl" data-act="toggle-dark"><span></span></button>
       </div>
       <div class="set-row col">
+        <div class="set-txt"><b>Language</b><span class="hint">Your players’ screens use the same language</span></div>
+        <div class="seg lang-seg" role="group" aria-label="Language">
+          <button type="button" data-lang="en" aria-pressed="false" lang="en">English</button>
+          <button type="button" data-lang="pt" aria-pressed="false" lang="pt-BR">Português (BR)</button>
+        </div>
+      </div>
+      <div class="set-row col">
         <div class="set-txt"><b>Text size</b><span class="hint">Makes all text in the app smaller or larger</span></div>
         <div class="seg fs-seg" role="group" aria-label="Text size">
           <button type="button" data-fs="s" aria-pressed="false"><span style="font-size:.85em">A</span> Small</button>
@@ -1629,7 +1638,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-143332';
+const APP_BUILD = '20261123-150612';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -1692,6 +1701,7 @@ function isDark() {
   return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 }
 function renderSettings() {
+  document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
   $('#darkSwitch').setAttribute('aria-checked', String(isDark()));
   const fs = ls.get('pb-fs', 'm');
   document.querySelectorAll('[data-fs]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fs === fs)));
@@ -3783,7 +3793,7 @@ function publicEnc() {
   const hiddenNames = new Set(state.enc.list.filter(c => c.hidden).flatMap(c => [c.name, ...(c.oldNames || [])]));
   const cur = encFind(state.enc.turnId);
   return {
-    round: state.enc.round || 0,
+    round: state.enc.round || 0, lang: LANG,  // the players' screens use the DM's language
     turnId: cur && !cur.hidden ? cur.id : null,
     list: encSorted().filter(c => !c.hidden).map(c => {
       // the monster's picture (players see the thumbnail and can open the full image)
@@ -3816,6 +3826,7 @@ const pvRollText = r => `<span class="what">
 </span>`;
 let pvLastKey = null;  // null until the first render, so the first roll shown doesn't flash
 function renderPlayerView(d) {
+  if (d && d.lang && state.role === 'player' && !state.previewPlayer && d.lang !== LANG) setLang(d.lang, false);  // follow the DM's language
   // whose turn it is: their token glows on the players' map
   if (d && (d.turnId || null) !== state.pvTurnId) { state.pvTurnId = d.turnId || null; if (state.pvMapData && !$('#pvMap').hidden) $('#pvToks').innerHTML = tokensHtml(state.pvMapData.tokens || [], { turn: state.pvTurnId }); }
   const list = (d && Array.isArray(d.list)) ? d.list.filter(c => c && c.name) : [];
@@ -4410,6 +4421,7 @@ document.addEventListener('click', async ev => {
   // maps
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
+  if (t.dataset.lang && t.closest('.lang-seg')) { setLang(t.dataset.lang); return; }
   if (t.dataset.hgroup) { state.heroGroup = t.dataset.hgroup; ls.set('pb-hgroup', state.heroGroup); renderHeroes(); return; }
   if (t.dataset.heroedit) { openHeroDlg(state.heroes.find(h => h.id === t.dataset.heroedit)); return; }
   if (t.dataset.herogrp && state.heroEd) { const g = t.dataset.herogrp, ids = state.heroEd.groupIds; state.heroEd.groupIds = ids.includes(g) ? ids.filter(x => x !== g) : [...ids, g]; renderHeroDlg(); return; }
@@ -4630,7 +4642,7 @@ document.addEventListener('click', async ev => {
     case 'pdf-stop': if (pdfImp.ctl) pdfImp.ctl.abort(); pdfImp.stop = true; break;
     case 'pdf-all': pdfImp.found.forEach(f => f.sel = true); renderPdfFound(); break;
     case 'pdf-none': pdfImp.found.forEach(f => f.sel = false); renderPdfFound(); break;
-    case 'pdf-discard': if (confirm('Discard the monsters found so far?')) { pdfImp.found = []; renderPdfFound(); } break;
+    case 'pdf-discard': if (confirm(trStr('Discard the monsters found so far?'))) { pdfImp.found = []; renderPdfFound(); } break;
     case 'pdf-save': savePdfFound(); break;
     case 'close-backup': $('#backup').hidden = true; break;
     case 'base-pick': startFromMonster(t.dataset.id); break;
@@ -5449,6 +5461,7 @@ function publicMap() {
   }
   return { id: m.id, name: m.name, image: m.image, w: m.w, h: m.h, marks: m.marks.filter(k => k.vis !== 'dm'),
     fog: m.fog && m.fog.on ? m.fog : null,
+    lang: LANG,
     // tokens: not ones linked to a hidden monster, and not ones under fog
     tokens: resolveTokens(m).filter(t => !t.hidden && !isFogged(m, t)).map(({ hidden, ...t }) => t),
     // "Sync view": the part of the map the DM is looking at, so players see the same (only while the DM has this map open)
@@ -5479,6 +5492,7 @@ function stopShowingMap(quiet) {
 
 /* --- the players' screen: Initiative / Map switch --- */
 function setPvMap(d) {
+  if (d && d.lang && state.role === 'player' && !state.previewPlayer && d.lang !== LANG) setLang(d.lang, false);
   state.pvMapData = d && d.image ? d : null;
   // The DM pressed Send: jump to the map (once per send). Players can switch back themselves;
   // later mark changes on the same send don't pull them back. (Remembered in memory, and across claude.ai reloads.)
@@ -5953,6 +5967,325 @@ function setupFullscreen() {
   document.addEventListener('webkitfullscreenchange', syncFullscreen);
   syncFullscreen();
 }
+
+/* ---------- language: English / Português (Brasil) ----------
+   The app is written in English. In Portuguese, a translation layer swaps the text as it appears on screen (text,
+   placeholders, tooltips, labels) using the table below; switching back restores the English. It only ever replaces
+   a whole piece of text that matches the table, so monsters, names and notes you typed are left alone.
+   The DM's choice also goes to the players' screens. */
+const PT = {
+  // tabs, header, general
+  "Bestiary": "Bestiário", "Initiative": "Iniciativa", "Maps": "Mapas", "Tokens": "Tokens", "Heroes": "Heróis", "Sections": "Seções",
+  "Settings": "Configurações", "Full screen": "Tela cheia", "Exit full screen": "Sair da tela cheia", "Connecting…": "Conectando…", "Synced": "Sincronizado",
+  "Syncing…": "Sincronizando…", "Offline": "Offline", "Offline copy": "Cópia offline", "Not connected · read-only": "Desconectado · só leitura",
+  "Access changed · read-only": "Acesso alterado · só leitura", "Sync stopped · reload to retry": "Sincronização parada · recarregue para tentar de novo",
+  "Updating players…": "Atualizando os jogadores…", "Opening…": "Abrindo…", "Cancel": "Cancelar", "Save": "Salvar", "Delete": "Excluir", "Close": "Fechar",
+  "Done": "Pronto", "Edit": "Editar", "Add": "Adicionar", "Paste": "Colar", "Copy": "Copiar", "Open": "Abrir", "Preview": "Pré-visualizar", "Link": "Link",
+  "Stop": "Parar", "Keep it": "Manter", "Keep editing": "Continuar editando", "Discard": "Descartar", "If you discard, your changes are lost.": "Se descartar, as alterações serão perdidas.",
+  "None": "Nenhum", "Name": "Nome", "Picture": "Imagem", "No picture": "Sem imagem", "Choose picture": "Escolher imagem", "Change picture": "Trocar imagem",
+  "Remove picture": "Remover imagem", "Choose a picture": "Escolher uma imagem", "Paste a picture here": "Cole uma imagem aqui", "Notes": "Notas", "Title": "Título",
+  "Tags": "Tags", "Size": "Tamanho", "Colour": "Cor", "Pick any colour": "Escolher qualquer cor", "Search": "Buscar", "← Back": "← Voltar",
+  "Signed in": "Conectado", "Sign out": "Sair", "DM sign in": "Entrar como mestre", "Link copied": "Link copiado",
+  "Selected. Copy it with your device’s copy command.": "Selecionado. Copie com o comando de copiar do seu aparelho.",
+  "Press Ctrl+V now to paste the picture.": "Pressione Ctrl+V agora para colar a imagem.",
+  "Press Ctrl+V now to paste the picture for this player.": "Pressione Ctrl+V agora para colar a imagem deste jogador.",
+  "There’s no picture on your clipboard. Copy an image first, then tap Paste.": "Não há imagem na área de transferência. Copie uma imagem e toque em Colar.",
+  "That file isn’t a picture. Pick a JPG, PNG, WebP or GIF.": "Esse arquivo não é uma imagem. Escolha JPG, PNG, WebP ou GIF.",
+  "That picture is too big (20 MB max).": "Essa imagem é grande demais (máximo de 20 MB).",
+  "Couldn’t upload the picture. Check your connection and try again.": "Não foi possível enviar a imagem. Verifique a conexão e tente de novo.",
+  "Wait for the picture to finish uploading, then save.": "Espere a imagem terminar de enviar e depois salve.",
+  "Wait for the current picture to finish uploading.": "Espere a imagem atual terminar de enviar.",
+  "Pictures can only be added by the toolbox owner.": "Só o dono da caixa de ferramentas pode adicionar imagens.",
+  "Pictures can only be changed by the bestiary’s owner.": "Só o dono do bestiário pode trocar imagens.",
+  "Couldn’t save. Check your connection and tap Save again.": "Não foi possível salvar. Verifique a conexão e toque em Salvar de novo.",
+  "This browser didn’t allow full screen.": "Este navegador não permitiu tela cheia.",
+  // settings
+  "Language": "Idioma", "Your players’ screens use the same language": "As telas dos jogadores usam o mesmo idioma", "Dark mode": "Modo escuro",
+  "Light or dark colours": "Cores claras ou escuras", "Text size": "Tamanho do texto", "Makes all text in the app smaller or larger": "Deixa todo o texto do app menor ou maior",
+  "Small": "Pequeno", "A Normal": "A Normal", "Large": "Grande", "These are saved on this device only.": "Isto fica salvo só neste aparelho.",
+  "Backup & import": "Backup e importação", "Save your bestiary, send it to the website, or bring monsters in": "Salve seu bestiário, envie para o site ou traga monstros",
+  // bestiary
+  "Monsters": "Monstros", "Books": "Livros", "Search name, type, tag…": "Buscar nome, tipo, tag…", "Search monsters": "Buscar monstros", "Sort": "Ordenar",
+  "A–Z": "A–Z", "CR ↑": "ND ↑", "CR ↓": "ND ↓", "Newest": "Mais novos", "+ New": "+ Novo", "Filter by type": "Filtrar por tipo", "Import PDF": "Importar PDF",
+  "Stat block": "Ficha", "All monsters": "Todos os monstros", "+ New book": "+ Novo livro", "Edit book": "Editar livro", "New book": "Novo livro",
+  "Title on the cover": "Título na capa", "Cover": "Capa", "Cover colour": "Cor da capa", "Two-tone": "Duas cores", "Delete book": "Excluir livro", "Book saved": "Livro salvo",
+  "Give the book a title.": "Dê um título ao livro.", "Not connected, so the book can’t be saved right now.": "Desconectado, então o livro não pode ser salvo agora.",
+  "Pick a monster from the list to see its stat block.": "Escolha um monstro da lista para ver a ficha.", "← List": "← Lista", "Duplicate": "Duplicar",
+  "Close stat block": "Fechar ficha", "No monsters match.": "Nenhum monstro encontrado.", "All": "Todos", "Opening your bestiary…": "Abrindo seu bestiário…",
+  "Your monsters appear here once they load.": "Seus monstros aparecem aqui quando carregarem.",
+  "No books yet. Create one with “+ New book” on the Bestiary shelf.": "Nenhum livro ainda. Crie um com “+ Novo livro” na estante do Bestiário.",
+  "Tap every book this monster belongs in.": "Toque em cada livro a que este monstro pertence.", "Unnamed monster": "Monstro sem nome",
+  // stat block
+  "Armor Class": "Classe de Armadura", "Hit Points": "Pontos de Vida", "Hit points": "Pontos de vida", "Speed": "Deslocamento", "Saving Throws": "Testes de Resistência",
+  "Saving throws": "Testes de resistência", "Skills": "Perícias", "Vulnerabilities": "Vulnerabilidades", "Resistances": "Resistências", "Immunities": "Imunidades",
+  "Damage Vulnerabilities": "Vulnerabilidades a Dano", "Damage Resistances": "Resistências a Dano", "Damage Immunities": "Imunidades a Dano", "Damage immunities": "Imunidades a dano",
+  "Condition Immunities": "Imunidades a Condição", "Condition immunities": "Imunidades a condição", "Senses": "Sentidos", "Languages": "Idiomas", "Challenge": "Desafio",
+  "Challenge rating": "Nível de desafio", "Proficiency Bonus": "Bônus de Proficiência", "Traits": "Características", "Actions": "Ações", "Bonus Actions": "Ações Bônus",
+  "Reactions": "Reações", "Legendary Actions": "Ações Lendárias", "Lair Actions": "Ações de Covil", "DM notes": "Notas do mestre", "Damage": "Dano", "Heal": "Curar",
+  "Reset": "Restaurar", "Amount": "Quantidade", "Max HP": "PV máx.", "Passive Perception": "Percepção Passiva",
+  "STR": "FOR", "DEX": "DES", "CON": "CON", "INT": "INT", "WIS": "SAB", "CHA": "CAR", "AC": "CA", "HP": "PV", "CR": "ND",
+  "Strength": "Força", "Dexterity": "Destreza", "Constitution": "Constituição", "Intelligence": "Inteligência", "Wisdom": "Sabedoria", "Charisma": "Carisma",
+  // editor
+  "New monster": "Novo monstro", "Edit monster": "Editar monstro", "Start from a monster in your bestiary": "Começar a partir de um monstro do bestiário",
+  "Making a variant? Pick a monster and its whole stat block fills in below. Change what you need, give it a new name and tap Save. The original stays as it is.": "Fazendo uma variante? Escolha um monstro e a ficha inteira é preenchida abaixo. Mude o que precisar, dê um novo nome e toque em Salvar. O original fica como está.",
+  "Search your bestiary, e.g. red dragon": "Busque no bestiário, ex.: dragão vermelho", "Search your bestiary for a base monster": "Buscar um monstro base no bestiário",
+  "Paste a stat block": "Colar uma ficha", "Copy a whole stat block (from a PDF, D&D Beyond, GM Binder, a website…) and paste it here. The form below fills in; check it, then tap Save.": "Copie uma ficha inteira (de um PDF, D&D Beyond, GM Binder, um site…) e cole aqui. O formulário abaixo é preenchido; confira e toque em Salvar.",
+  "Only have a picture? Paste a screenshot into the box above, or": "Só tem uma imagem? Cole uma captura de tela na caixa acima, ou", "Stop reading": "Parar a leitura",
+  "Fill in the form": "Preencher o formulário", "Identity": "Identidade", "JPG, PNG, WebP or GIF. Large photos are shrunk before upload.": "JPG, PNG, WebP ou GIF. Fotos grandes são reduzidas antes de enviar.",
+  "Type": "Tipo", "Custom type": "Tipo personalizado", "Tags in type (optional)": "Etiquetas no tipo (opcional)", "e.g. Shapechanger": "ex.: Metamorfo", "Alignment": "Tendência",
+  "Custom alignment": "Tendência personalizada", "Books this monster is in": "Livros em que este monstro está", "Defense & movement": "Defesa e movimento", "AC note": "Nota da CA",
+  "natural armor": "armadura natural", "Die": "Dado", "Bonus": "Bônus", "Bonus and Hit Points fill in automatically (CON modifier × dice, and the average roll). Type a number to override either one.": "Bônus e Pontos de Vida são preenchidos sozinhos (modificador de CON × dados e a média). Digite um número para substituir qualquer um.",
+  "+ Add movement": "+ Adicionar deslocamento", "Ability scores": "Atributos", "Bonus = ability modifier + proficiency bonus. Type a number to override it.": "Bônus = modificador do atributo + bônus de proficiência. Digite um número para substituir.",
+  "+ Add saving throw": "+ Adicionar teste de resistência", "Bonus = ability modifier + proficiency bonus, doubled for expertise. Type a number to override it.": "Bônus = modificador do atributo + bônus de proficiência, dobrado com especialização. Digite um número para substituir.",
+  "+ Add skill": "+ Adicionar perícia", "+ Add sense": "+ Adicionar sentido", "Leave blank for 10 + Perception bonus.": "Deixe em branco para 10 + bônus de Percepção.",
+  "Telepathy range (ft.)": "Alcance da telepatia (pés)", "Damage & conditions": "Dano e condições", "For the DM": "Para o mestre", "campaign, act 2, boss": "campanha, ato 2, chefe",
+  "Comma-separated. Search finds these.": "Separadas por vírgula. A busca encontra essas.", "Tactics, lore, where the party meets it…": "Táticas, história, onde o grupo o encontra…",
+  "Pasted from a PDF? Auto-format fixes broken lines and spacing.": "Colou de um PDF? A formatação automática corrige linhas quebradas e espaços.", "Auto-format": "Formatar",
+  "Dice like": "Dados como", "and attack bonuses like": "e bônus de ataque como", "become tap-to-roll buttons in the stat block.": "viram botões de rolar na ficha.",
+  "Give the monster a name before saving.": "Dê um nome ao monstro antes de salvar.", "Add hit dice or type the Hit Points before saving.": "Adicione os dados de vida ou digite os Pontos de Vida antes de salvar.",
+  "Nothing to format yet.": "Nada para formatar ainda.", "Already tidy.": "Já está arrumado.", "Formatted. Tap Undo to get your original text back.": "Formatado. Toque em Desfazer para recuperar o texto original.",
+  "Restored your original text.": "Seu texto original foi restaurado.", "Passive abilities shown above Actions": "Habilidades passivas mostradas acima das Ações",
+  "The monster can take 3 legendary actions…": "O monstro pode realizar 3 ações lendárias…", "On initiative count 20 (losing initiative ties), the monster takes a lair action…": "Na contagem de iniciativa 20 (perdendo empates), o monstro realiza uma ação de covil…",
+  "Paste a stat block into the box first.": "Cole uma ficha na caixa primeiro.", "Reading the picture… this can take up to a minute.": "Lendo a imagem… pode levar até um minuto.",
+  "Stopped. You can fix the text and tap Fill in the form.": "Parado. Você pode corrigir o texto e tocar em Preencher o formulário.",
+  "Reading pictures isn’t available here. Paste the text instead.": "Ler imagens não está disponível aqui. Cole o texto.",
+  "Claude isn’t allowed to read pictures for this app. You can still paste text.": "O Claude não tem permissão para ler imagens neste app. Você ainda pode colar o texto.",
+  "That picture couldn’t be read (too big or an unsupported type). Try a smaller screenshot.": "Não foi possível ler essa imagem (grande demais ou tipo não suportado). Tente uma captura menor.",
+  "Too many requests right now. Try again in a minute.": "Muitos pedidos agora. Tente de novo em um minuto.", "Claude couldn’t transcribe that picture. Paste the text instead.": "O Claude não conseguiu transcrever essa imagem. Cole o texto.",
+  "Your Claude session expired. Sign in again, then try.": "Sua sessão do Claude expirou. Entre de novo e tente.", "Couldn’t read the picture. Check your connection and try again.": "Não foi possível ler a imagem. Verifique a conexão e tente de novo.",
+  "Can’t save right now: the bestiary isn’t connected. Check your connection and reopen the page.": "Não dá para salvar agora: o bestiário não está conectado. Verifique a conexão e reabra a página.",
+  "This bestiary is read-only for you, so changes can’t be saved.": "Este bestiário é só leitura para você, então as alterações não podem ser salvas.",
+  "The bestiary is full. Delete a few monsters, then save again.": "O bestiário está cheio. Exclua alguns monstros e salve de novo.",
+  "Picture storage is full. Remove pictures from other monsters first.": "O espaço de imagens está cheio. Remova imagens de outros monstros primeiro.",
+  "That picture format isn’t supported. Try JPG or PNG.": "Esse formato de imagem não é suportado. Tente JPG ou PNG.",
+  "That was text, not a picture. Copy an image first, then paste it here.": "Isso era texto, não uma imagem. Copie uma imagem e cole aqui.",
+  "Choose a picture, or paste one (Ctrl+V, or tap the box and Paste). Large photos are shrunk before upload.": "Escolha uma imagem ou cole uma (Ctrl+V, ou toque na caixa e em Colar). Fotos grandes são reduzidas antes de enviar.",
+  // PDF import
+  "Import from PDF": "Importar de PDF", "1. Pick the PDF": "1. Escolha o PDF", "Choose a PDF": "Escolher um PDF", "No file yet.": "Nenhum arquivo ainda.",
+  "Claude reads each page of your own PDF and finds the stat blocks on it. Each page is one request on your Claude usage and takes about 20–60 seconds, so try a few pages first.": "O Claude lê cada página do seu PDF e encontra as fichas nela. Cada página é um pedido no seu uso do Claude e leva uns 20–60 segundos, então teste algumas páginas primeiro.",
+  "2. Pages and book": "2. Páginas e livro", "From page": "Da página", "To page": "Até a página", "Put the monsters in": "Colocar os monstros em", "New book's name": "Nome do novo livro",
+  "e.g. Volo": "ex.: Volo", "Read pages": "Ler páginas", "Continue": "Continuar", "3. Check and save": "3. Conferir e salvar",
+  "Untick anything you don’t want. Monsters already in your bestiary start unticked.": "Desmarque o que não quiser. Monstros que já estão no bestiário começam desmarcados.",
+  "opens one in the editor first.": "abre um no editor primeiro.", "Tick all": "Marcar todos", "Untick all": "Desmarcar todos", "Discard list": "Descartar lista", "Save ticked": "Salvar marcados",
+  "+ A new book…": "+ Um novo livro…", "Discard the monsters found so far?": "Descartar os monstros encontrados até agora?", "That isn’t a PDF.": "Isso não é um PDF.",
+  "Couldn’t load the PDF reader. Check your connection and try again.": "Não foi possível carregar o leitor de PDF. Verifique a conexão e tente de novo.",
+  "Couldn’t open that PDF. It may be damaged or password-protected.": "Não foi possível abrir esse PDF. Ele pode estar danificado ou protegido por senha.",
+  "Give the new book a name.": "Dê um nome ao novo livro.", "Reading pictures isn’t available here. Use the toolbox on claude.ai.": "Ler imagens não está disponível aqui. Use a caixa de ferramentas no claude.ai.",
+  "Claude is busy (too many requests). Wait a minute, then tap Continue.": "O Claude está ocupado (pedidos demais). Espere um minuto e toque em Continuar.",
+  "Claude isn’t allowed to read pictures for this app.": "O Claude não tem permissão para ler imagens neste app.", "Your Claude session expired. Sign in again, then tap Continue.": "Sua sessão do Claude expirou. Entre de novo e toque em Continuar.",
+  // backup
+  "Export": "Exportar", "Export file": "Exportar arquivo", "Import": "Importar", "Choose a JSON file": "Escolher um arquivo JSON", "Import finished": "Importação concluída",
+  "Bestiary brought in from the app": "Bestiário trazido do app", "No monsters found in that file.": "Nenhum monstro encontrado nesse arquivo.", "Download cancelled.": "Download cancelado.",
+  "Not connected, so nothing was imported.": "Desconectado, então nada foi importado.", "The export didn’t finish. Try again.": "A exportação não terminou. Tente de novo.",
+  "Confirm the download to save the file…": "Confirme o download para salvar o arquivo…", "Saving monsters, books, groups and maps…": "Salvando monstros, livros, grupos e mapas…",
+  "That file isn’t a Dante’s GM Toolbox export. Choose the .json file you exported.": "Esse arquivo não é uma exportação do Dante's GM Toolbox. Escolha o arquivo .json que você exportou.",
+  "Choose a file exported from the claude.ai app. The website’s monsters, books and groups are replaced with the ones in the file. Your current fight stays.": "Escolha um arquivo exportado do app no claude.ai. Os monstros, livros e grupos do site são substituídos pelos do arquivo. O combate atual continua.",
+  "Choose a backup file. Its monsters, books and groups are added, and ones you already have are updated. Nothing is deleted.": "Escolha um arquivo de backup. Os monstros, livros e grupos dele são adicionados, e os que você já tem são atualizados. Nada é excluído.",
+  "Saves one file with all your monsters, books, player groups and their pictures. Keep it as a backup, or import it on the website to play there.": "Salva um arquivo com todos os seus monstros, livros, grupos de jogadores e imagens. Guarde como backup ou importe no site para jogar lá.",
+  "Saves one file with everything on the website: monsters, books, player groups and their pictures.": "Salva um arquivo com tudo do site: monstros, livros, grupos de jogadores e imagens.",
+  "Your player groups are now in the Heroes tab.": "Seus grupos de jogadores agora estão na aba Heróis.",
+  "None of the monsters in this file are in your bestiary yet. Import their books first.": "Nenhum monstro deste arquivo está no seu bestiário ainda. Importe os livros deles primeiro.",
+  // initiative
+  "Initiative tracker": "Controle de iniciativa", "Round": "Rodada", "Previous turn": "Turno anterior", "◂ Prev": "◂ Anterior", "Start": "Começar", "Next ▸": "Próximo ▸", "Next": "Próximo", "Prev": "Anterior",
+  "Send now": "Enviar agora", "Groups": "Grupos", "+ Add monster": "+ Adicionar monstro", "Player view": "Tela dos jogadores", "Clear": "Limpar", "Stats": "Ficha", "Hidden": "Oculto",
+  "No one in the fight yet": "Ninguém no combate ainda", "Add players with their initiative, then add monsters from your bestiary. Monsters roll initiative and track their own hit points.": "Adicione os jogadores com a iniciativa e depois os monstros do bestiário. Os monstros rolam a iniciativa e controlam os próprios pontos de vida.",
+  "PC": "PJ", "DOWN": "CAÍDO", "HIDDEN": "OCULTO", "Hidden monsters don't appear on the players' screen": "Monstros ocultos não aparecem na tela dos jogadores",
+  "Clear the encounter? Everyone is removed from the tracker and from the players’ screen.": "Limpar o encontro? Todos saem do controle e da tela dos jogadores.",
+  "Tap Stat block on a monster, or reach a monster’s turn, to see its stat block here.": "Toque em Ficha num monstro, ou chegue ao turno de um monstro, para ver a ficha aqui.",
+  "Add monsters": "Adicionar monstros", "Filter by book": "Filtrar por livro", "Search your bestiary…": "Buscar no bestiário…", "Add as hidden": "Adicionar oculto",
+  "(players won’t see them until you untick Hidden in the tracker)": "(os jogadores não os veem até você desmarcar Oculto no controle)",
+  "Tap a monster to add one. Tap again to add another. Each rolls its own initiative.": "Toque num monstro para adicionar um. Toque de novo para adicionar outro. Cada um rola a própria iniciativa.",
+  "Add players": "Adicionar jogadores", "Player name": "Nome do jogador", "Init": "Inic.", "Armor Class, for example 16 or 16/18": "Classe de Armadura, por exemplo 16 ou 16/18",
+  "Add as many as you need, then tap Done.": "Adicione quantos precisar e toque em Pronto.", "Players from earlier fights": "Jogadores de combates anteriores",
+  "Tap a name, then type their roll.": "Toque num nome e digite a rolagem.", "In this fight": "Neste combate", "Enter the player’s initiative roll.": "Digite a rolagem de iniciativa do jogador.",
+  "← Groups": "← Grupos", "Player groups": "Grupos de jogadores", "+ New group": "+ Novo grupo", "Add to fight": "Adicionar ao combate",
+  "Type each player's initiative roll. You can leave any blank and fill it in later by tapping the number in the tracker.": "Digite a rolagem de iniciativa de cada jogador. Pode deixar em branco e preencher depois tocando no número no controle.",
+  "Everyone in that group is already in the fight.": "Todos desse grupo já estão no combate.", "That group has no heroes yet. Add some in the Heroes tab.": "Esse grupo ainda não tem heróis. Adicione alguns na aba Heróis.",
+  "Couldn’t sync the encounter. It’s still saved on this device.": "Não foi possível sincronizar o encontro. Ele continua salvo neste aparelho.",
+  "Couldn’t update the players’ screen. It will try again on the next turn.": "Não foi possível atualizar a tela dos jogadores. Vai tentar de novo no próximo turno.",
+  "Couldn’t update the player page. It will try again on the next turn.": "Não foi possível atualizar a página dos jogadores. Vai tentar de novo no próximo turno.",
+  "Sending to players too fast. Trying again in a few seconds.": "Enviando rápido demais para os jogadores. Tentando de novo em alguns segundos.",
+  "The player page can’t be updated from this screen.": "A página dos jogadores não pode ser atualizada desta tela.",
+  "Players see the turn order only: names, whose turn it is, the round, and who is down. No stat blocks, hit points, rolls, books or pictures, and no account needed.": "Os jogadores veem só a ordem dos turnos: nomes, de quem é a vez, a rodada e quem caiu. Sem fichas, pontos de vida, livros ou imagens, e sem precisar de conta.",
+  "Send players the link below.": "Envie o link abaixo aos jogadores.",
+  // dice tray
+  "d20 rolls": "Rolagens de d20", "ADV": "VANT", "DIS": "DESV", "Tap any dice to roll": "Toque em qualquer dado para rolar", "Ability scores, attacks, damage": "Atributos, ataques, dano", "Dice": "Dados",
+  // players' screen
+  "Initiative order": "Ordem de iniciativa", "What to show": "O que mostrar", "Map": "Mapa", "Fit": "Ajustar", "Fit the whole map on screen": "Mostrar o mapa inteiro na tela",
+  "No map right now": "Nenhum mapa agora", "Your DM isn’t showing a map at the moment.": "Seu mestre não está mostrando um mapa no momento.",
+  "This is what your players see.": "Isto é o que seus jogadores veem.", "Back to DM view": "Voltar à visão do mestre", "No fight yet": "Nenhum combate ainda",
+  "The turn order appears here when your DM starts an encounter. It updates by itself.": "A ordem dos turnos aparece aqui quando o mestre começa um encontro. Ela se atualiza sozinha.",
+  "Rolls": "Rolagens", "Earlier rolls": "Rolagens anteriores", "No rolls yet. They show up here as your DM rolls.": "Nenhuma rolagem ainda. Elas aparecem aqui conforme o mestre rola.",
+  "Latest roll": "Última rolagem", "Current turn": "Turno atual", "Up next:": "A seguir:", "Now": "Agora", "Up next": "A seguir", "Pin": "Marcador", "Token": "Token", "Untitled pin": "Marcador sem título",
+  // maps
+  "Map list": "Lista de mapas", "Map folders": "Pastas de mapas", "Search maps…": "Buscar mapas…", "Search maps": "Buscar mapas", "+ New map": "+ Novo mapa",
+  "Pick a map from the list, or add one with": "Escolha um mapa da lista ou adicione um com", "← Maps": "← Mapas", "Rename map": "Renomear mapa", "LIVE": "AO VIVO", "Details": "Detalhes",
+  "Stop showing": "Parar de mostrar", "Send to players": "Enviar aos jogadores", "Send again": "Enviar de novo", "Map tools": "Ferramentas do mapa", "Tool": "Ferramenta",
+  "Drag to move (with any tool: right or middle mouse button, or hold Space and drag). Scroll or pinch to zoom. Tap a pin or text to edit it.": "Arraste para mover (com qualquer ferramenta: botão direito ou do meio do mouse, ou segure Espaço e arraste). Role ou faça pinça para dar zoom. Toque num marcador ou texto para editar.",
+  "Move": "Mover", "Tap the map to drop a pin with a note": "Toque no mapa para colocar um marcador com nota", "Draw lines": "Desenhar linhas", "Pen": "Caneta",
+  "See-through brush to colour areas": "Pincel transparente para colorir áreas", "Paint": "Pintar", "Tap the map to write text": "Toque no mapa para escrever texto", "Text": "Texto",
+  "Tap a mark to delete it": "Toque numa marca para apagá-la", "Erase": "Apagar", "Who sees new marks": "Quem vê as novas marcas", "Players see": "Jogadores veem", "DM only": "Só o mestre",
+  "↶ Undo": "↶ Desfazer", "Players' map follows your zoom and position while it's on their screen": "O mapa dos jogadores segue seu zoom e posição enquanto estiver na tela deles",
+  "Sync view: off": "Sincronizar visão: não", "Sync view: on": "Sincronizar visão: sim",
+  "Sync view is on: players see what you see while this map is on their screen.": "Sincronizar visão ligado: os jogadores veem o que você vê enquanto este mapa estiver na tela deles.",
+  "Sync view is off: players move the map themselves.": "Sincronizar visão desligado: os jogadores movem o mapa sozinhos.",
+  "Put a token on the map (drag it with the Move tool)": "Colocar um token no mapa (arraste com a ferramenta Mover)", "+ Token": "+ Token", "Token size": "Tamanho do token",
+  "Remove from map": "Tirar do mapa", "Hide the map from players and reveal it room by room": "Esconder o mapa dos jogadores e revelar sala por sala", "Fog: off": "Névoa: não", "Fog: on": "Névoa: sim",
+  "Fog tool": "Ferramenta de névoa", "Drag a box to reveal a room": "Arraste uma caixa para revelar uma sala", "Reveal ▭": "Revelar ▭", "Paint to reveal (size: S/M/L)": "Pinte para revelar (tamanho: P/M/G)",
+  "Reveal ✎": "Revelar ✎", "Click the corners of a room to reveal it": "Clique nos cantos de uma sala para revelá-la", "Reveal ⬠": "Revelar ⬠", "Drag a box to cover an area again": "Arraste uma caixa para cobrir uma área de novo",
+  "Hide ▭": "Esconder ▭", "Paint to cover again (size: S/M/L)": "Pinte para cobrir de novo (tamanho: P/M/G)", "Hide ✎": "Esconder ✎", "Click the corners of an area to cover it again": "Clique nos cantos de uma área para cobri-la de novo",
+  "Hide ⬠": "Esconder ⬠", "Reveal all": "Revelar tudo", "Hide all": "Esconder tudo", "Turn fog on first.": "Ligue a névoa primeiro.", "Drag a box over the area.": "Arraste uma caixa sobre a área.",
+  "Fog is on: players see nothing. Drag boxes to reveal rooms.": "Névoa ligada: os jogadores não veem nada. Arraste caixas para revelar as salas.",
+  "Click each corner. Click the first point, double-click or press Enter to finish; Esc cancels.": "Clique em cada canto. Clique no primeiro ponto, dê dois cliques ou pressione Enter para terminar; Esc cancela.",
+  "A shape needs at least 3 corners.": "Uma forma precisa de pelo menos 3 cantos.", "Tap right on a mark to erase it.": "Toque bem em cima de uma marca para apagá-la.",
+  "Map details": "Detalhes do mapa", "Folder": "Pasta", "No folder": "Sem pasta", "Delete map": "Excluir mapa", "New folder": "Nova pasta", "Edit folder": "Editar pasta", "Folder name": "Nome da pasta",
+  "Folder colour": "Cor da pasta", "Delete folder": "Excluir pasta", "Folder saved": "Pasta salva", "Give the folder a name.": "Dê um nome à pasta", "All maps": "Todos os mapas",
+  "Label": "Rótulo", "Note (optional)": "Nota (opcional)", "Who sees it": "Quem vê", "Players no longer see a map": "Os jogadores não veem mais um mapa", "Preparing the map…": "Preparando o mapa…",
+  "Couldn’t add the map. Check your connection and try again.": "Não foi possível adicionar o mapa. Verifique a conexão e tente de novo.",
+  "Couldn’t save the map marks. They’re still here; they’ll save with the next change.": "Não foi possível salvar as marcas do mapa. Elas continuam aqui; serão salvas na próxima mudança.",
+  "Couldn’t update the players’ map. Try Send again.": "Não foi possível atualizar o mapa dos jogadores. Tente Enviar de novo.",
+  "That file isn’t a picture. Pick a JPG, PNG or WebP map.": "Esse arquivo não é uma imagem. Escolha um mapa JPG, PNG ou WebP.", "That map is too big. Try a smaller picture.": "Esse mapa é grande demais. Tente uma imagem menor.",
+  "Drag the token with the Move tool. The slider changes its size.": "Arraste o token com a ferramenta Mover. O controle deslizante muda o tamanho.",
+  "Put a token on the map": "Colocar um token no mapa", "No tokens yet. Make some in the": "Nenhum token ainda. Crie alguns na aba", "tab.": ".",
+  // tokens
+  "+ New token": "+ Novo token", "New token": "Novo token", "Edit token": "Editar token", "Rim colour": "Cor da borda", "Linked to (initiative)": "Vinculado a (iniciativa)", "Not linked": "Sem vínculo",
+  "Linked creature isn’t in the fight": "A criatura vinculada não está no combate", "No tokens yet": "Nenhum token ainda", "Tap": "Toque em", ", pick a picture, a rim colour and a name.": ", escolha uma imagem, uma cor de borda e um nome.",
+  "Make tokens here, then put them on a map with": "Crie tokens aqui e depois coloque-os num mapa com", "e.g. Aria, Goblin boss": "ex.: Aria, Chefe goblin", "Token saved": "Token salvo",
+  "in the Maps tab. Link a token to someone in the initiative and it glows on their turn; a token linked to a hidden monster stays hidden from the players.": "na aba Mapas. Vincule um token a alguém da iniciativa e ele brilha no turno dessa pessoa; um token vinculado a um monstro oculto fica escondido dos jogadores.",
+  "Give the token a name.": "Dê um nome ao token.", "Not connected, so the token can’t be saved right now.": "Desconectado, então o token não pode ser salvo agora.",
+  // heroes
+  "All PCs": "Todos os PJs", "Search heroes…": "Buscar heróis…", "Search heroes": "Buscar heróis", "+ New hero": "+ Novo herói", "New hero": "Novo herói", "Edit hero": "Editar herói",
+  "e.g. Aria": "ex.: Aria", "e.g. 16 or 16/18": "ex.: 16 ou 16/18", "No token": "Sem token", "Edit group": "Editar grupo", "New group": "Novo grupo", "Group name": "Nome do grupo",
+  "e.g. Curse of Strahd party": "ex.: grupo de Curse of Strahd", "Group colour": "Cor do grupo", "Delete group": "Excluir grupo", "Group saved": "Grupo salvo", "Hero saved": "Herói salvo",
+  "Make tokens in the Tokens tab. When this hero joins a fight, the token is linked to them there.": "Crie tokens na aba Tokens. Quando este herói entra num combate, o token é vinculado a ele lá.",
+  "Give the hero a name.": "Dê um nome ao herói.", "Give the group a name.": "Dê um nome ao grupo.", "No AC": "Sem CA", "No heroes here.": "Nenhum herói aqui.", "No heroes yet": "Nenhum herói ainda",
+  "Not connected, so the hero can’t be saved right now.": "Desconectado, então o herói não pode ser salvo agora.", "Not connected, so the group can’t be saved right now.": "Desconectado, então o grupo não pode ser salvo agora.",
+  "Thursday party": "Grupo de quinta", "Players": "Jogadores", "No groups yet": "Nenhum grupo ainda",
+  "Full": "Cheio", "Tap to rename": "Toque para renomear", "Changes only this creature in the fight, not its stat block": "Muda só esta criatura no combate, não a ficha",
+  "+ New folder": "+ Nova pasta", "Add to a book": "Adicionar a um livro",
+  "Melee Weapon Attack:": "Ataque Corpo a Corpo com Arma:", "Ranged Weapon Attack:": "Ataque à Distância com Arma:", "Melee or Ranged Weapon Attack:": "Ataque Corpo a Corpo ou à Distância com Arma:",
+  "Melee Spell Attack:": "Ataque Corpo a Corpo com Magia:", "Ranged Spell Attack:": "Ataque à Distância com Magia:", "Melee or Ranged Spell Attack:": "Ataque Corpo a Corpo ou à Distância com Magia:",
+  // skills (as shown in a stat block)
+  "Acrobatics": "Acrobacia", "Animal Handling": "Lidar com Animais", "Arcana": "Arcanismo", "Athletics": "Atletismo", "Deception": "Enganação", "History": "História",
+  "Insight": "Intuição", "Intimidation": "Intimidação", "Investigation": "Investigação", "Medicine": "Medicina", "Nature": "Natureza", "Perception": "Percepção",
+  "Performance": "Atuação", "Persuasion": "Persuasão", "Religion": "Religião", "Sleight of Hand": "Prestidigitação", "Stealth": "Furtividade", "Survival": "Sobrevivência",
+  // editor lists
+  "Proficient": "Proficiente", "Expertise": "Especialização", "Intro": "Introdução", "Other…": "Outro…",
+  "+ Add trait": "+ Adicionar característica", "+ Add action": "+ Adicionar ação", "+ Add bonus action": "+ Adicionar ação bônus", "+ Add reaction": "+ Adicionar reação",
+  "+ Add legendary action": "+ Adicionar ação lendária", "+ Add lair action": "+ Adicionar ação de covil", "B/P/S from nonmagical attacks": "Concussão/Perfurante/Cortante de ataques não mágicos",
+  "Common": "Comum", "Dwarvish": "Anão", "Elvish": "Élfico", "Giant": "Gigante", "Gnomish": "Gnômico", "Halfling": "Halfling", "Orc": "Orc", "Abyssal": "Abissal", "Celestial": "Celestial",
+  "Deep Speech": "Dialeto Subterrâneo", "Draconic": "Dracônico", "Infernal": "Infernal", "Primordial": "Primordial", "Sylvan": "Silvestre", "Undercommon": "Subcomum", "Druidic": "Druídico",
+  "Thieves' Cant": "Gíria de Ladrão", "Acid": "Ácido", "Bludgeoning": "Concussão", "Cold": "Frio", "Fire": "Fogo", "Force": "Energia", "Lightning": "Elétrico", "Necrotic": "Necrótico",
+  "Piercing": "Perfurante", "Poison": "Veneno", "Psychic": "Psíquico", "Radiant": "Radiante", "Slashing": "Cortante", "Thunder": "Trovão",
+  "Blinded": "Cego", "Charmed": "Enfeitiçado", "Deafened": "Surdo", "Exhaustion": "Exaustão", "Frightened": "Amedrontado", "Grappled": "Agarrado", "Incapacitated": "Incapacitado",
+  "Invisible": "Invisível", "Paralyzed": "Paralisado", "Petrified": "Petrificado", "Poisoned": "Envenenado", "Prone": "Caído", "Restrained": "Contido", "Stunned": "Atordoado", "Unconscious": "Inconsciente"
+};
+// Comma lists in a stat block made only of these words (languages, damage types, conditions) are translated word by word.
+const PT_WORDS = {}; Object.entries(PT).forEach(([k, v]) => { if (/^[A-Z][a-z' ]+$/.test(k)) PT_WORDS[k.toLowerCase()] = v; });
+// Size, type and alignment words (stat block line "Small humanoid (goblinoid), neutral evil" and the list lines).
+const PT_SIZE = { Tiny: 'Miúdo', Small: 'Pequeno', Medium: 'Médio', Large: 'Grande', Huge: 'Enorme', Gargantuan: 'Imenso' };
+const PT_TYPE = { aberration: 'aberração', beast: 'fera', celestial: 'celestial', construct: 'constructo', dragon: 'dragão', elemental: 'elemental', fey: 'fada',
+  fiend: 'corruptor', giant: 'gigante', humanoid: 'humanoide', monstrosity: 'monstruosidade', ooze: 'limo', plant: 'planta', undead: 'morto-vivo', swarm: 'enxame' };
+const PT_ALIGN = { 'lawful good': 'leal e bom', 'neutral good': 'neutro e bom', 'chaotic good': 'caótico e bom', 'lawful neutral': 'leal e neutro', 'neutral': 'neutro',
+  'chaotic neutral': 'caótico e neutro', 'lawful evil': 'leal e mau', 'neutral evil': 'neutro e mau', 'chaotic evil': 'caótico e mau', 'unaligned': 'sem tendência',
+  'any alignment': 'qualquer tendência', 'any evil alignment': 'qualquer tendência maligna', 'any non-evil alignment': 'qualquer tendência não maligna',
+  'any chaotic alignment': 'qualquer tendência caótica', 'any lawful alignment': 'qualquer tendência leal' };
+const ptType = t => PT_TYPE[t.toLowerCase()] || t;
+const PT_SENSE = { darkvision: 'visão no escuro', blindsight: 'percepção às cegas', tremorsense: 'sentido sísmico', truesight: 'visão verdadeira', 'passive Perception': 'Percepção passiva' };
+// Text with numbers or names in it.
+const PT_RX = [
+  [/^(\d+) monsters?$/, (m, n) => `${n} monstro${n == 1 ? '' : 's'}`], [/^(\d+) heroes$/, (m, n) => `${n} heróis`], [/^(\d+) hero(es)?$/, (m, n) => `${n} herói${n == 1 ? '' : 's'}`],
+  [/^(\d+) maps?$/, (m, n) => `${n} mapa${n == 1 ? '' : 's'}`], [/^Round (\d+)$/, 'Rodada $1'], [/^Current turn · round (\d+)$/, 'Turno atual · rodada $1'],
+  [/^Updated (.+)$/, 'Atualizado $1'], [/^Linked: (.+) \(hidden\)$/, 'Vinculado: $1 (oculto)'], [/^Linked: (.+)$/, 'Vinculado: $1'],
+  [/^CR (.+) · AC (.+) · HP (.+) · Init (.+)$/, 'ND $1 · CA $2 · PV $3 · Inic. $4'],
+  [/^(Tiny|Small|Medium|Large|Huge|Gargantuan) ([A-Za-z-]+) · AC (.+) · HP (.+)$/, (m, s, t, ac, hp) => `${PT_SIZE[s]} ${ptType(t)} · CA ${ac} · PV ${hp}`],
+  // stat block type line: "Small humanoid (goblinoid), neutral evil"
+  [/^(Tiny|Small|Medium|Large|Huge|Gargantuan) ([A-Za-z-]+)( \([^)]*\))?, (.+)$/i, (m, s, t, sub, al) => `${PT_SIZE[s[0].toUpperCase() + s.slice(1).toLowerCase()] || s} ${ptType(t)}${sub || ''}, ${PT_ALIGN[al.toLowerCase()] || al}`],
+  // challenge line: "1/4 (50 XP) · Proficiency Bonus +2"
+  [/^(.+) \((.+) XP\) · Proficiency Bonus (.+)$/, '$1 ($2 XP) · Bônus de Proficiência $3'],
+  // senses line: "darkvision 60 ft., passive Perception 10"
+  [/^((darkvision|blindsight|tremorsense|truesight|passive Perception)[^,]*)(, (darkvision|blindsight|tremorsense|truesight|passive Perception)[^,]*)*$/,
+    m => m.replace(/darkvision|blindsight|tremorsense|truesight|passive Perception/g, w => PT_SENSE[w]).replace(/ ft\./g, ' pés')],
+  [/^CR (.+)$/, 'ND $1'], [/^AC (.+)$/, 'CA $1'], [/^HP (.+)$/, 'PV $1'], [/^page (\d+)$/, 'página $1'],
+  [/^(\d+) of (\d+) ticked$/, '$1 de $2 marcados'], [/^Save (\d+) monsters?$/, (m, n) => `Salvar ${n} monstro${n == 1 ? '' : 's'}`],
+  [/^Deleted “(.+)”$/, '“$1” excluído'], [/^Created “(.+)”$/, '“$1” criado'],
+  [/^Showing “(.+)” to your players$/, 'Mostrando “$1” aos jogadores'], [/^Made the token “(.+)”$/, 'Token “$1” criado'],
+  [/^Sending (\d+) rolls? to players…$/, 'Enviando $1 rolagem(ns) aos jogadores…'], [/^Saved (\d+) monsters?\.$/, '$1 monstro(s) salvo(s).'],
+  [/^Added (\d+) monsters?\.$/, '$1 monstro(s) adicionado(s).'], [/^Refreshed (\d+) monsters?\.$/, '$1 monstro(s) atualizado(s).'],
+  [/^Delete (.+)\? This removes it from every device\.$/, 'Excluir $1? Isso remove de todos os aparelhos.'], [/^Save changes to (.+)\?$/, 'Salvar as alterações em $1?'],
+  [/^Save (.+) to your bestiary\?$/, 'Salvar $1 no seu bestiário?'], [/^Show (.+) full size$/, 'Mostrar $1 em tamanho cheio'], [/^Stat block for (.+)$/, 'Ficha de $1'],
+  [/^Initiative for (.+)$/, 'Iniciativa de $1'], [/^Name of (.+)$/, 'Nome de $1'], [/^Remove (.+)$/, 'Remover $1'],
+  [/^Delete the group “(.+)”\? Its heroes stay in All PCs\.$/, 'Excluir o grupo “$1”? Os heróis continuam em Todos os PJs.'],
+  [/^Delete (.+) from your heroes\? Fights they’re already in keep them\.$/, 'Excluir $1 dos heróis? Os combates em que já está continuam com ele.'],
+  [/^Delete the token “(.+)”\? It also comes off every map it’s on\.$/, 'Excluir o token “$1”? Ele também sai de todos os mapas.'],
+  [/^Delete the map “(.+)” and all its marks\? This can’t be undone\.$/, 'Excluir o mapa “$1” e todas as marcas? Não dá para desfazer.'],
+  [/^Added (\d+) players?(.*)$/, (m, n, rest) => `${n} jogador${n == 1 ? '' : 'es'} adicionado${n == 1 ? '' : 's'}${rest ? '. Toque nos 0 para definir a iniciativa que falta.' : ''}`],
+  [/^(\d+) heroes? · (.+)$/, '$1 heróis · $2'],
+  [/^avg (.+)$/, 'média $1'],
+  [/^[A-Za-z' ]+(, [A-Za-z' ]+)+$/, m => { const parts = m.split(', '); if (!parts.every(p => PT_WORDS[p.toLowerCase()])) return null;
+    return parts.map(p => { const t = PT_WORDS[p.toLowerCase()]; return p[0] === p[0].toLowerCase() ? t.toLowerCase() : t; }).join(', '); }],
+  // general ones last, so the specific ones above win
+  [/^Added (.+) \((-?\d+)\)$/, '$1 adicionado ($2)'], [/^Added (.+)$/, '$1 adicionado'], [/^Deleted (.+)$/, '$1 excluído']
+];
+let LANG = (() => { const s = ls.get('pb-lang', ''); return s === 'pt' || s === 'en' ? s : /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en'; })();
+function trStr(s) {
+  if (LANG !== 'pt' || !s) return s;
+  const k = s.replace(/\s+/g, ' ').trim(); if (!k) return s;
+  let t = Object.prototype.hasOwnProperty.call(PT, k) ? PT[k] : null;
+  if (t == null) for (const [rx, f] of PT_RX) { const m = k.match(rx); if (m) { t = typeof f === 'function' ? f(...m) : k.replace(rx, f); if (t != null) break; } }
+  if (t == null) return s;
+  const lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0];
+  return lead + t + trail;
+}
+const TR_ATTRS = ['placeholder', 'title', 'aria-label'];
+const trSrc = new WeakMap();  // node -> {text: [english, shown]} / element -> {attr: [english, shown]}
+const trSkip = n => { const p = n.nodeType === 1 ? n : n.parentElement; return !p || !!p.closest('script, style, textarea, [contenteditable], .no-tr'); };
+function trText(n) {
+  if (trSkip(n)) return;
+  const v = n.nodeValue, rec = trSrc.get(n);
+  const en = rec && v === rec[1] ? rec[0] : v;   // unchanged since we translated it: keep the English source
+  const out = trStr(en);
+  trSrc.set(n, [en, out]);
+  if (out !== v) n.nodeValue = out;
+}
+function trAttr(el, a) {
+  if (el.closest('script, style, .no-tr')) return;  // placeholders and tooltips are app text, even on text boxes
+  const v = el.getAttribute(a); if (v == null) return;
+  let recs = trSrc.get(el); if (!recs) { recs = {}; trSrc.set(el, recs); }
+  const rec = recs[a], en = rec && v === rec[1] ? rec[0] : v, out = trStr(en);
+  recs[a] = [en, out];
+  if (out !== v) el.setAttribute(a, out);
+}
+function trTree(root) {
+  if (!root) return;
+  if (root.nodeType === 3) return trText(root);
+  if (root.nodeType !== 1) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) if (/[A-Za-z]/.test(n.nodeValue)) trText(n);
+  const els = root.querySelectorAll('[placeholder], [title], [aria-label]');
+  [root, ...els].forEach(el => TR_ATTRS.forEach(a => el.hasAttribute && el.hasAttribute(a) && trAttr(el, a)));
+}
+let trTouched = false;  // nothing to restore until Portuguese has been used once
+new MutationObserver(list => {
+  if (LANG !== 'pt' && !trTouched) return;
+  for (const r of list) {
+    if (r.type === 'childList') r.addedNodes.forEach(trTree);
+    else if (r.type === 'characterData') trText(r.target);
+    else if (r.type === 'attributes' && TR_ATTRS.includes(r.attributeName)) trAttr(r.target, r.attributeName);
+  }
+}).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: TR_ATTRS });
+function setLang(l, save = true) {
+  l = l === 'pt' ? 'pt' : 'en';
+  if (save) ls.set('pb-lang', l);
+  if (l === LANG) return;
+  LANG = l; if (l === 'pt') trTouched = true;
+  document.documentElement.lang = l === 'pt' ? 'pt-BR' : 'en';
+  trTree(document.body);
+  document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
+  // the players' screens follow the DM's language (website: on the next check, about a second)
+}
+document.documentElement.lang = LANG === 'pt' ? 'pt-BR' : 'en';
+if (LANG === 'pt') { trTouched = true; trTree(document.body); }
 
 /* ---------- boot ---------- */
 async function waitForClaude() {
