@@ -3,7 +3,8 @@
    - db: Firestore, scoped to the signed-in GM. The app's collections (monsters, books, maps…) live under gms/<uid>/;
      the players' screen data (public/current, public/map) lives under play/<code>/state/, where <code> is the GM's
      player-link code. Pictures (assets/) and the shared SRD list (srd/) are global.
-   - user: a GM is someone the database lets read gms/<their uid> (invited, or the admin; see the Firestore rules)
+   - user: a GM is someone the database lets read gms/<their uid> (invited by link, or the admin; see the Firestore rules)
+   - admin.html: the admin page (access, invite links, storage, sign-in history)
    - assets: pictures stored in Firestore as data URLs; sw.js serves them at _blob/<id>
    - artifact: a marker so the app pushes the players' screen through public/current
    Players open …#players/<code>: no sign-in, they only read play/<code>/state/. */
@@ -122,20 +123,67 @@
     }
   };
 
-  // The code in a player link: …#players/<code>
+  // The code in a player link: …#players/<code>; in an invite link: …#invite/<code>
   const linkCode = () => { const m = /^#players\/([a-z0-9]{4,32})$/i.exec(location.hash); return m ? m[1].toLowerCase() : null; };
+  const inviteCode = () => { const m = /^#invite\/([a-z0-9]{8,40})$/i.exec(location.hash); return m ? m[1].toLowerCase() : null; };
   const playDoc = (code, name) => fs.doc(`play/${code}/state/${name}`);
 
+  // "Chrome on Android", for the access history
+  const deviceName = () => {
+    const u = navigator.userAgent;
+    const b = /Edg\//.test(u) ? 'Edge' : /SamsungBrowser/.test(u) ? 'Samsung Internet' : /OPR\//.test(u) ? 'Opera' : /Firefox\//.test(u) ? 'Firefox' : /Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : 'Browser';
+    const o = /Android/.test(u) ? 'Android' : /iPhone|iPad|iPod/.test(u) ? 'iOS' : /Windows/.test(u) ? 'Windows' : /Mac OS X/.test(u) ? 'Mac' : /CrOS/.test(u) ? 'ChromeOS' : /Linux/.test(u) ? 'Linux' : '';
+    return o ? `${b} on ${o}` : b;
+  };
+  // An invite link: this Google account becomes a GM, and the link is used up (the rules check both together).
+  async function redeem(code) {
+    const u = auth.currentUser, email = String(u.email || '').toLowerCase();
+    const b = fs.batch();
+    b.set(fs.doc('invites/' + email), { at: Date.now(), code, via: 'link', name: u.displayName || '' });
+    b.update(fs.doc('inviteCodes/' + code), { usedBy: email, usedAt: Date.now(), uid: u.uid });
+    try { await b.commit(); return true; } catch { return false; }
+  }
+  /* After Google sign-in (popup, or back from the redirect): check access, use an invite link, log the sign-in,
+     then open the toolbox or the admin page. Returns {error} when the account can't come in. */
+  async function finishSignIn(intent) {
+    gmCheck = null; adminCheck = null;
+    let ok = await isGM();
+    const code = inviteCode();
+    if (!ok && code) {
+      if (!(await redeem(code))) { await auth.signOut(); return { error: 'badInvite' }; }
+      gmCheck = null; ok = await isGM();
+    }
+    if (!ok) { const email = auth.currentUser && auth.currentUser.email; await auth.signOut(); return { error: 'notInvited', email }; }
+    const u = auth.currentUser, at = Date.now();
+    try { await fs.collection('logins').add({ uid: u.uid, email: u.email || '', name: u.displayName || '', at, device: deviceName(), via: code ? 'invite' : intent }); } catch {}
+    try { await fs.doc('gms/' + u.uid).set({ lastSignIn: at, email: u.email || '', name: u.displayName || '' }, { merge: true }); } catch {}
+    try { localStorage.setItem('pb-role', JSON.stringify('dm')); } catch {}
+    if (intent === 'admin') {
+      if (await isAdmin()) { location.href = 'admin.html'; return { ok: true }; }
+      return { error: 'notAdmin' };
+    }
+    location.hash = ''; location.reload();
+    return { ok: true };
+  }
+  // Back from a redirect sign-in (phones where the popup is blocked)
+  let pendingIntent = null; try { pendingIntent = sessionStorage.getItem('pb-signin'); sessionStorage.removeItem('pb-signin'); } catch {}
+  const signInResult = pendingIntent
+    ? auth.getRedirectResult().then(r => r && r.user ? finishSignIn(pendingIntent) : null, () => ({ error: 'failed' }))
+    : Promise.resolve(null);
+
   window.SITE = {
-    async signIn() {
+    async signIn(intent = 'gm') {
       const p = new firebase.auth.GoogleAuthProvider();
+      p.setCustomParameters({ prompt: 'select_account' });
       try { await auth.signInWithPopup(p); }
-      catch (e) { if (e && /popup/i.test(e.code || '')) return auth.signInWithRedirect(p); throw e; }
-      gmCheck = null; adminCheck = null;
-      if (!(await isGM())) { alert(window.SITE_t ? window.SITE_t('notInvited') : 'This Google account isn’t invited to be a GM here. Ask the toolbox owner for an invite.'); await auth.signOut(); return; }
-      try { localStorage.setItem('pb-role', JSON.stringify('dm')); } catch {}
-      location.hash = ''; location.reload();
+      catch (e) {
+        if (e && /popup-blocked|operation-not-supported/i.test(e.code || '')) { try { sessionStorage.setItem('pb-signin', intent); } catch {} return auth.signInWithRedirect(p); }
+        if (e && /popup-closed|cancelled-popup/i.test(e.code || '')) return { error: 'cancelled' };
+        throw e;
+      }
+      return finishSignIn(intent);
     },
+    signInResult,
     async signOut() {
       await auth.signOut();
       try { localStorage.removeItem('pb-role'); localStorage.removeItem('pb-cache'); } catch {}
@@ -145,6 +193,7 @@
     isAdmin,
     // players' screen
     linkCode,
+    inviteCode,
     watchPlayers: cb => { const c = linkCode(); if (!c) { cb(null); return () => {}; } return playDoc(c, 'current').onSnapshot(s => cb(s.exists ? s.data() : null), () => cb(null)); },
     watchMap: cb => { const c = linkCode() || (gm && gm.playerCode); if (!c) { cb(null); return () => {}; } return playDoc(c, 'map').onSnapshot(s => cb(s.exists ? s.data() : null), () => {}); },
     playerLink: () => gm && gm.playerCode ? location.origin + location.pathname + '#players/' + gm.playerCode : '',
@@ -161,43 +210,6 @@
     // the shared SRD list
     watchSrd: cb => fs.collection('srd').onSnapshot(s => cb(s.docs.map(d => ({ ...d.data(), id: d.id }))), () => cb([])),
     srdDoc: id => fs.doc('srd/' + id),
-    // invites (admin only)
-    invites: {
-      list: async () => (await fs.collection('invites').get()).docs.map(d => ({ email: d.id, at: d.data().at || 0 })),
-      add: email => fs.doc('invites/' + String(email).trim().toLowerCase()).set({ at: Date.now() }),
-      remove: email => fs.doc('invites/' + String(email).trim().toLowerCase()).delete()
-    },
-    /* One-time move (admin): the single-DM data at the top level goes into this GM's own space, and the monsters
-       in the book called "SRD" go to the shared SRD list instead (not copied into the personal bestiary).
-       Nothing at the top level is deleted. */
-    async migrateLegacy(onStep) {
-      const uid = auth.currentUser.uid, base = `gms/${uid}/`;
-      const names = ['books', 'monsters', 'groups', 'heroes', 'maps', 'mapFolders', 'tokens'];
-      const data = {};
-      for (const n of names) { onStep && onStep(`Reading ${n}…`); data[n] = (await fs.collection(n).get()).docs; }
-      const srdBook = data.books.find(d => String(d.data().name || '').trim().toLowerCase() === 'srd');
-      const srdId = srdBook ? srdBook.id : null;
-      const writes = [], counts = { personal: 0, srd: 0, srdAlsoPersonal: 0 };
-      for (const n of names) for (const d of data[n]) {
-        const v = d.data();
-        if (n === 'books' && d.id === srdId) continue;
-        if (n === 'monsters' && srdId && (v.bookIds || []).includes(srdId)) {
-          writes.push(['srd/' + d.id, { ...v, bookIds: [] }]); counts.srd++;
-          const other = (v.bookIds || []).filter(b => b !== srdId);
-          if (other.length) { writes.push([base + 'monsters/' + d.id + '_own', { ...v, bookIds: other }]); counts.srdAlsoPersonal++; }
-          continue;
-        }
-        writes.push([base + n + '/' + d.id, v]); counts.personal++;
-      }
-      const enc = await fs.doc('encounters/current').get();
-      if (enc.exists) writes.push([base + 'encounters/current', enc.data()]);
-      for (let i = 0; i < writes.length; i += 40) {
-        onStep && onStep(`Saving… ${Math.min(i + 40, writes.length)} of ${writes.length}`);
-        const b = fs.batch(); writes.slice(i, i + 40).forEach(([p, v]) => b.set(fs.doc(p), v)); await b.commit();
-      }
-      await fs.doc('gms/' + uid).set({ migratedAt: Date.now() }, { merge: true });
-      return counts;
-    },
     putAsset,
     putAssetLarge,
     imgSrc: id => window.SITE_imgSrc(id),

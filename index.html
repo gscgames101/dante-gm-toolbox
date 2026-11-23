@@ -270,9 +270,6 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 .erow-top { display: flex; gap: 6px; }
 .erow-top input { flex: 1; min-width: 0; font-weight: 700; }
 .err { color: var(--bad); font-size: .9rem; }
-.invite-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
-.invite-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
-.invite-list li.hint, .invite-list li.err { border-style: dashed; }
 .confirm-box { max-width: 420px; margin: 20vh auto 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: grid; gap: 14px; }
 .sheet.dim { background: color-mix(in srgb, var(--bg) 70%, transparent); }
 .row-end { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
@@ -333,6 +330,18 @@ textarea { resize: vertical; min-height: 76px; line-height: 1.4; }
 #edBooks .chip { display: inline-flex; align-items: center; gap: 6px; }
 #edBooks .chip::before { content: ""; width: 9px; height: 12px; border-radius: 1px 2px 2px 1px; background: var(--book); }
 
+/* Website front door */
+.login-view { position: fixed; inset: 0; z-index: 60; overflow: auto; background: var(--bg); display: grid; place-items: center; padding: 24px 16px; }
+.login-view[hidden] { display: none; }
+.login-card { width: min(420px, 100%); display: grid; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); text-align: center; }
+.login-title { font-family: var(--display); font-weight: 400; font-size: 2rem; line-height: 1.1; color: var(--accent); margin: 0; }
+.login-sub { margin: 0; color: var(--muted); }
+.login-note { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); border: 1px solid var(--accent); text-align: left; }
+.login-note.err { color: var(--bad); border-color: var(--bad); background: transparent; font-size: 1rem; }
+.login-go { min-height: 48px; font-size: 1.05rem; }
+.login-players { margin: 0; }
+.login-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.login-foot .lang-seg { flex: 1; max-width: 240px; }
 /* Roles: "boot" until we know who is viewing, "player" for shared viewers (or the DM's preview), "dm" for the owner. */
 .player-view, .boot { display: none; }
 .app[data-role="boot"] main, .app[data-role="boot"] .tabs, .app[data-role="boot"] #newBtn, .app[data-role="boot"] .tray { display: none; }
@@ -989,10 +998,27 @@ button.cb-pic { cursor: zoom-in; }
         </div>
       </div>
       <p class="pv-at" id="pvAt" hidden></p>
-      <div class="pv-signin" id="pvSignin" hidden><button type="button" class="btn small ghost" data-act="dm-signin">DM sign in</button></div>
     </div>
   </main>
   <div class="boot" id="boot"><p>Opening…</p></div>
+  <!-- Website front door (no player code in the address): GM sign-in, and the admin's way to the admin page -->
+  <section class="login-view" id="loginView" hidden>
+    <div class="login-card">
+      <h1 class="login-title no-tr">Dante’s GM Toolbox</h1>
+      <p class="login-sub">Bestiary, initiative, maps and tokens for your table.</p>
+      <p class="login-note" id="loginInvite" hidden>You’ve been invited to be a GM. Sign in with the Google account you want to use.</p>
+      <p class="login-note err" id="loginErr" role="alert" hidden></p>
+      <button type="button" class="btn primary login-go" data-act="dm-signin">Sign in with Google</button>
+      <p class="hint login-players">Players: open the link your GM sent you.</p>
+      <div class="login-foot">
+        <div class="seg lang-seg" role="group" aria-label="Language">
+          <button type="button" data-lang="en" aria-pressed="false" lang="en">English</button>
+          <button type="button" data-lang="pt" aria-pressed="false" lang="pt-BR">Português (BR)</button>
+        </div>
+        <button type="button" class="btn small ghost" data-act="admin-signin">Admin</button>
+      </div>
+    </div>
+  </section>
 
   <nav class="tabs gutter" aria-label="Sections">
     <button data-tab-go="bestiary" aria-pressed="true">Bestiary</button>
@@ -1259,8 +1285,8 @@ button.cb-pic { cursor: zoom-in; }
         <button type="button" class="btn small" data-act="dm-signout">Sign out</button>
       </div>
       <div class="set-row" id="adminRow" hidden>
-        <div class="set-txt"><b>GMs and data</b><span class="hint">Invite GMs and move your existing bestiary into your account</span></div>
-        <button type="button" class="btn small" data-act="admin-open">Open</button>
+        <div class="set-txt"><b>Admin page</b><span class="hint">Access, invite links, storage and sign-in history</span></div>
+        <a class="btn small" href="admin.html">Open</a>
       </div>
       <div class="row-end"><button type="button" class="btn primary" data-act="set-close">Done</button></div>
     </div>
@@ -1339,28 +1365,6 @@ button.cb-pic { cursor: zoom-in; }
         <button type="submit" class="btn primary" id="folderSave">Save</button>
       </div>
     </form>
-  </div>
-</div>
-
-<div class="sheet" id="adminSheet" hidden>
-  <div class="sheet-in gutter">
-    <div class="sheet-head">
-      <button type="button" class="btn ghost" data-act="admin-close">Close</button>
-      <h2>GMs and data</h2>
-    </div>
-    <fieldset>
-      <legend>Invited GMs</legend>
-      <p class="hint" style="margin:0">Only these Google accounts (and you) can sign in as a GM. Each GM gets their own bestiary, maps, tokens and heroes, plus the shared SRD, and their own player link.</p>
-      <ul class="invite-list" id="inviteList"></ul>
-      <form class="add-custom" id="inviteForm" autocomplete="off" novalidate><input id="inviteEmail" type="email" placeholder="name@gmail.com" aria-label="Google email to invite"><button type="submit" class="btn small primary">Invite</button></form>
-      <p class="hint" id="inviteMsg" style="margin:0" hidden></p>
-    </fieldset>
-    <fieldset>
-      <legend>Move your existing data</legend>
-      <p class="hint" style="margin:0">One time: copies the bestiary you had before GM accounts (monsters, books, groups, heroes, maps, tokens and the current fight) into your account. Monsters in your book called <b>SRD</b> go to the shared SRD list instead, which every GM sees. Nothing is deleted.</p>
-      <div class="row-end"><button type="button" class="btn primary" data-act="admin-migrate" id="migrateBtn">Move my data</button></div>
-      <p class="hint" id="migrateMsg" style="margin:0" hidden></p>
-    </fieldset>
   </div>
 </div>
 
@@ -1668,7 +1672,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-174610';
+const APP_BUILD = '20261123-195021';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3960,10 +3964,8 @@ function showPlayers() {
   document.addEventListener('visibilitychange', keepAwake);
   document.addEventListener('pointerdown', keepAwake, { passive: true });  // some browsers only allow it after a tap
   if (SITE) {
-    // Website: follow the DM's live turn order. The sign-in button is for the DM (hidden on the #players link).
-    $('#pvSignin').hidden = !!SITE.linkCode();
-    // no player code in the address: this is the site's front door, not a players' screen
-    if (!SITE.linkCode()) $('#pvEmpty').innerHTML = '<h3>Dante’s GM Toolbox</h3><p>Players: open the link your GM sent you. GMs: sign in below.</p>';
+    // Website: no player code in the address means this is the front door (sign-in page), not a players' screen
+    if (!SITE.linkCode()) { showLogin(); return; }
     renderPlayerView(null);
     SITE.watchPlayers(d => { reloadIfOutdated(d); renderPlayerView(d); });
     if (SITE.watchMap) SITE.watchMap(d => { reloadIfOutdated(d); setPvMap(d && d.map); });
@@ -3972,6 +3974,29 @@ function showPlayers() {
   const pub = readPub();
   renderPlayerView(pub);
   setPvMap(pub && pub.map);
+}
+/* Website front door: GMs sign in with Google; an invite link (#invite/<code>) makes a new GM; the Admin button opens the admin page. */
+function showLogin() {
+  $('#loginView').hidden = false;
+  $('#loginInvite').hidden = !SITE.inviteCode();
+  document.querySelectorAll('#loginView [data-lang]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === LANG)));
+  const u = SITE.user();
+  if (u) loginResult({ error: 'notInvited', email: u.email });  // still signed in, but no longer a GM
+  SITE.signInResult.then(loginResult);  // back from a redirect sign-in
+}
+function loginResult(r) {
+  const el = $('#loginErr');
+  if (!r || !r.error || r.error === 'cancelled') return;
+  el.hidden = false;
+  el.textContent = r.error === 'badInvite' ? 'This invite link was already used or cancelled. Ask the toolbox owner for a new one.'
+    : r.error === 'notInvited' ? (r.email ? `${r.email} isn’t a GM here. Ask the toolbox owner for an invite link.` : 'This Google account isn’t a GM here. Ask the toolbox owner for an invite link.')
+    : r.error === 'notAdmin' ? 'This account isn’t the admin. Opening your toolbox…'
+    : 'Sign-in didn’t finish. Try again.';
+  if (r.error === 'notAdmin') setTimeout(() => { location.hash = ''; location.reload(); }, 2200);
+}
+function loginStart(intent) {
+  $('#loginErr').hidden = true;
+  SITE.signIn(intent).then(loginResult, () => loginResult({ error: 'failed' }));
 }
 function setRole(r) {
   state.role = r;
@@ -4475,7 +4500,6 @@ document.addEventListener('click', async ev => {
   if (t.dataset.mfolder) { state.mapFolder = t.dataset.mfolder; renderMaps(); $('#mapListScroll').scrollTop = 0; return; }
   if (t.dataset.mapopen) { openMap(t.dataset.mapopen); return; }
   if (t.dataset.lang && t.closest('.lang-seg')) { setLang(t.dataset.lang); return; }
-  if (t.dataset.uninvite) { const e = t.dataset.uninvite; showConfirm(`Remove ${e} as a GM? They can't sign in any more; their data stays in the database.`, 'Remove', async () => { try { await SITE.invites.remove(e); renderInvites(); } catch (err) { toast(saveErrorText(err)); } }); return; }
   if (t.dataset.hgroup) { state.heroGroup = t.dataset.hgroup; ls.set('pb-hgroup', state.heroGroup); renderHeroes(); return; }
   if (t.dataset.heroedit) { openHeroDlg(state.heroes.find(h => h.id === t.dataset.heroedit)); return; }
   if (t.dataset.herogrp && state.heroEd) { const g = t.dataset.herogrp, ids = state.heroEd.groupIds; state.heroEd.groupIds = ids.includes(g) ? ids.filter(x => x !== g) : [...ids, g]; renderHeroDlg(); return; }
@@ -4544,9 +4568,6 @@ document.addEventListener('click', async ev => {
     case 'turn-next': moveTurn(1); break;
     case 'send-rolls': clearTimeout(playersTimer); publishPlayers(); break;
     case 'turn-prev': moveTurn(-1); break;
-    case 'admin-open': $('#setSheet') && ($('#setSheet').hidden = true); openAdmin(); break;
-    case 'admin-close': $('#adminSheet').hidden = true; break;
-    case 'admin-migrate': showConfirm('Copy your existing bestiary into your GM account now? Monsters in the SRD book go to the shared SRD list.', 'Move my data', migrateData); break;
     case 'pv-reset': if (SITE) showConfirm('Make a new player link? The current link stops working; send your players the new one.', 'Reset link', async () => {
       try { $('#pvLink').value = await SITE.resetPlayerLink(); mapSentKey = null; playersSentKey = null; schedulePlayersUpdate(0); if (state.shownMap) pushMapSoon(0); toast('New player link ready. Copy it and send it to your players.'); }
       catch (e) { toast(saveErrorText(e)); }
@@ -4618,7 +4639,8 @@ document.addEventListener('click', async ev => {
     case 'pv-fit': if (pvViewer) pvViewer.fit(); break;
     case 'pv-pin-close': $('#pvPinNote').hidden = true; break;
     case 'fullscreen': toggleFullscreen(); break;
-    case 'dm-signin': SITE.signIn().catch(() => toast('Sign-in didn’t finish. Try again.')); break;
+    case 'dm-signin': loginStart('gm'); break;
+    case 'admin-signin': loginStart('admin'); break;
     case 'dm-signout': SITE.signOut(); break;
     case 'site-export': exportForSite(); break;
     case 'pv-close': $('#pvSheet').hidden = true; break;
@@ -6031,63 +6053,25 @@ function setupFullscreen() {
   syncFullscreen();
 }
 
-/* ---------- website admin: invited GMs, moving the old single-DM data ---------- */
-async function openAdmin() {
-  if (!SITE || !state.isAdmin) return;
-  $('#adminSheet').hidden = false; $('#inviteMsg').hidden = true; $('#migrateMsg').hidden = true;
-  renderInvites();
-}
-async function renderInvites() {
-  const el = $('#inviteList');
-  try {
-    const list = (await SITE.invites.list()).sort((a, b) => a.email.localeCompare(b.email));
-    el.innerHTML = list.length ? list.map(i => `<li><span class="no-tr">${esc(i.email)}</span><button type="button" class="btn small ghost danger" data-uninvite="${esc(i.email)}">Remove</button></li>`).join('')
-      : '<li class="hint">No one invited yet.</li>';
-  } catch (e) { el.innerHTML = `<li class="err">${esc(saveErrorText(e))}</li>`; }
-}
-$('#inviteForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = str($('#inviteEmail').value).toLowerCase(), msg = $('#inviteMsg');
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.hidden = false; msg.className = 'err'; msg.textContent = 'Type a Google email address.'; return; }
-  try {
-    await SITE.invites.add(email); $('#inviteEmail').value = '';
-    msg.hidden = false; msg.className = 'hint ok'; msg.textContent = `Invited ${email}. They can now sign in on this site as a GM.`;
-    renderInvites();
-  } catch (err) { msg.hidden = false; msg.className = 'err'; msg.textContent = saveErrorText(err); }
-});
-async function migrateData() {
-  const btn = $('#migrateBtn'), msg = $('#migrateMsg');
-  btn.disabled = true; msg.hidden = false; msg.className = 'hint';
-  try {
-    const c = await SITE.migrateLegacy(t => { msg.textContent = t; });
-    msg.className = 'hint ok';
-    msg.textContent = `Done: ${c.personal} items moved into your account, ${c.srd} monsters into the shared SRD list.`
-      + (c.srdAlsoPersonal ? ` ${c.srdAlsoPersonal} SRD monsters were also in other books of yours; you keep your own copy of those in those books.` : '') + ' Reloading…';
-    setTimeout(() => location.reload(), 2500);
-  } catch (err) { msg.className = 'err'; msg.textContent = 'The move stopped: ' + saveErrorText(err) + ' Nothing was lost; try again.'; btn.disabled = false; }
-}
-window.SITE_t = k => trStr(k === 'notInvited' ? 'This Google account isn’t invited to be a GM here. Ask the toolbox owner for an invite.' : k);
-
 /* ---------- language: English / Português (Brasil) ----------
    The app is written in English. In Portuguese, a translation layer swaps the text as it appears on screen (text,
    placeholders, tooltips, labels) using the table below; switching back restores the English. It only ever replaces
    a whole piece of text that matches the table, so monsters, names and notes you typed are left alone.
    The DM's choice also goes to the players' screens. */
 const PT = {
-  "Remove": "Remover", "GMs and data": "Mestres e dados", "Invite GMs and move your existing bestiary into your account": "Convide mestres e mova seu bestiário atual para a sua conta",
-  "Invited GMs": "Mestres convidados", "Only these Google accounts (and you) can sign in as a GM. Each GM gets their own bestiary, maps, tokens and heroes, plus the shared SRD, and their own player link.": "Só estas contas Google (e você) podem entrar como mestre. Cada mestre tem o próprio bestiário, mapas, tokens e heróis, além do SRD compartilhado, e o próprio link dos jogadores.",
-  "Google email to invite": "E-mail Google a convidar", "Invite": "Convidar", "No one invited yet.": "Ninguém convidado ainda.", "Type a Google email address.": "Digite um endereço de e-mail Google.",
-  "Move your existing data": "Mover seus dados atuais", "One time: copies the bestiary you had before GM accounts (monsters, books, groups, heroes, maps, tokens and the current fight) into your account. Monsters in your book called ": "Uma vez só: copia o bestiário que você tinha antes das contas de mestre (monstros, livros, grupos, heróis, mapas, tokens e o combate atual) para a sua conta. Os monstros do seu livro chamado ",
-  " go to the shared SRD list instead, which every GM sees. Nothing is deleted.": " vão para a lista SRD compartilhada, que todos os mestres veem. Nada é excluído.",
-  "Move my data": "Mover meus dados", "Copy your existing bestiary into your GM account now? Monsters in the SRD book go to the shared SRD list.": "Copiar seu bestiário atual para a sua conta de mestre agora? Os monstros do livro SRD vão para a lista SRD compartilhada.",
+  "Remove": "Remover", "Admin page": "Página de administração", "Access, invite links, storage and sign-in history": "Acessos, links de convite, armazenamento e histórico de entradas",
+  "Bestiary, initiative, maps and tokens for your table.": "Bestiário, iniciativa, mapas e tokens para a sua mesa.",
+  "You’ve been invited to be a GM. Sign in with the Google account you want to use.": "Você foi convidado para ser mestre. Entre com a conta Google que quer usar.",
+  "Sign in with Google": "Entrar com o Google", "Players: open the link your GM sent you.": "Jogadores: abram o link que o mestre enviou.", "Admin": "Admin",
+  "This invite link was already used or cancelled. Ask the toolbox owner for a new one.": "Este link de convite já foi usado ou cancelado. Peça um novo ao dono da ferramenta.",
+  "This Google account isn’t a GM here. Ask the toolbox owner for an invite link.": "Esta conta Google não é de mestre aqui. Peça um link de convite ao dono da ferramenta.",
+  "This account isn’t the admin. Opening your toolbox…": "Esta conta não é a do admin. Abrindo sua ferramenta…", "Sign-in didn’t finish. Try again.": "A entrada não terminou. Tente de novo.",
   "Reset link": "Novo link", "Make a new player link? The current link stops working; send your players the new one.": "Criar um novo link dos jogadores? O link atual para de funcionar; envie o novo aos jogadores.",
   "New player link ready. Copy it and send it to your players.": "Novo link dos jogadores pronto. Copie e envie aos jogadores.",
   "SRD monsters are shared. Duplicate one to file your own copy in your books.": "Os monstros do SRD são compartilhados. Duplique um para guardar sua própria cópia nos seus livros.",
   "Saved as your own copy. The shared SRD monster stays as it is.": "Salvo como sua própria cópia. O monstro do SRD compartilhado continua como estava.",
   "SRD monsters are shared and can’t be deleted. Duplicate one to make your own.": "Os monstros do SRD são compartilhados e não podem ser excluídos. Duplique um para ter o seu.",
   "The SRD book is shared by every GM and can’t be edited.": "O livro SRD é compartilhado por todos os mestres e não pode ser editado.",
-  "Players: open the link your GM sent you. GMs: sign in below.": "Jogadores: abram o link que o mestre enviou. Mestres: entrem abaixo.",
-  "This Google account isn’t invited to be a GM here. Ask the toolbox owner for an invite.": "Esta conta Google não foi convidada para ser mestre aqui. Peça um convite ao dono da ferramenta.",
   // tabs, header, general
   "Bestiary": "Bestiário", "Initiative": "Iniciativa", "Maps": "Mapas", "Tokens": "Tokens", "Heroes": "Heróis", "Sections": "Seções",
   "Settings": "Configurações", "Full screen": "Tela cheia", "Exit full screen": "Sair da tela cheia", "Connecting…": "Conectando…", "Synced": "Sincronizado",
@@ -6308,11 +6292,7 @@ const ptType = t => PT_TYPE[t.toLowerCase()] || t;
 const PT_SENSE = { darkvision: 'visão no escuro', blindsight: 'percepção às cegas', tremorsense: 'sentido sísmico', truesight: 'visão verdadeira', 'passive Perception': 'Percepção passiva' };
 // Text with numbers or names in it.
 const PT_RX = [
-  [/^Invited (.+)\. They can now sign in on this site as a GM\.$/, 'Convite enviado a $1. Agora pode entrar neste site como mestre.'],
-  [/^Remove (.+) as a GM\? They can't sign in any more; their data stays in the database\.$/, 'Remover $1 como mestre? Não poderá mais entrar; os dados continuam no banco de dados.'],
-  [/^Done: (\d+) items moved into your account, (\d+) monsters into the shared SRD list\.(?: (\d+) SRD monsters were also in other books of yours; you keep your own copy of those in those books\.)? Reloading…$/,
-    (m, a, b, c) => `Pronto: ${a} itens movidos para a sua conta, ${b} monstros para a lista SRD compartilhada.${c ? ` ${c} monstros do SRD também estavam em outros livros seus; você fica com sua cópia nesses livros.` : ''} Recarregando…`],
-  [/^The move stopped: (.+) Nothing was lost; try again\.$/, 'A mudança parou: $1 Nada foi perdido; tente de novo.'],
+  [/^(.+) isn’t a GM here. Ask the toolbox owner for an invite link.$/, '$1 não é de mestre aqui. Peça um link de convite ao dono da ferramenta.'],
   [/^(\d+) monsters?$/, (m, n) => `${n} monstro${n == 1 ? '' : 's'}`], [/^(\d+) heroes$/, (m, n) => `${n} heróis`], [/^(\d+) hero(es)?$/, (m, n) => `${n} herói${n == 1 ? '' : 's'}`],
   [/^(\d+) maps?$/, (m, n) => `${n} mapa${n == 1 ? '' : 's'}`], [/^Round (\d+)$/, 'Rodada $1'], [/^Current turn · round (\d+)$/, 'Turno atual · rodada $1'],
   [/^Updated (.+)$/, 'Atualizado $1'], [/^Linked: (.+) \(hidden\)$/, 'Vinculado: $1 (oculto)'], [/^Linked: (.+)$/, 'Vinculado: $1'],

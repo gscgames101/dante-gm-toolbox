@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Toolbox Admin</title>
+<script>(function(){var t;try{t=JSON.parse(localStorage.getItem('pb-theme'))}catch(e){}if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;document.write('<meta name="color-scheme" content="'+(t==='light'?'only light':t==='dark'?'dark':'light dark')+'">')})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root {
+  --bg: #e7e9e1; --surface: #f5f6f1; --sunk: #dcdfd5; --ink: #1d2320; --muted: #5a645c; --line: #c6ccc0;
+  --accent: #8c1d22; --accent-ink: #fff; --accent-soft: #8c1d2214; --good: #2c7a4b; --bad: #a3361b; --warn: #9a6a00;
+  --display: "IM Fell English SC", Georgia, serif; --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299; --line: #2c332e;
+  --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f; --good: #6cc490; --bad: #f08a6a; --warn: #e2b54a; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299; --line: #2c332e;
+  --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f; --good: #6cc490; --bad: #f08a6a; --warn: #e2b54a; color-scheme: dark; }
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 1rem; line-height: 1.45; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2 { margin: 0; text-wrap: balance; }
+a { color: var(--accent); }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left, 0px)); }
+.top { border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 10px; padding-block: 12px; flex-wrap: wrap; }
+.brand { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand h1 { font-family: var(--display); font-weight: 400; font-size: 1.45rem; color: var(--accent); }
+.brand span { color: var(--muted); font-size: .9rem; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-weight: 500; text-decoration: none; color: var(--ink); white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.small { min-height: 32px; padding: 0 10px; font-size: .9rem; }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .55; cursor: default; }
+main { padding-block: 20px 48px; display: grid; gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.card-head h2 { flex: 1; font-family: var(--display); font-weight: 400; font-size: 1.35rem; color: var(--accent); }
+.hint { color: var(--muted); font-size: .9rem; margin: 0; }
+.err { color: var(--bad); margin: 0; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; }
+.row { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) 13rem; gap: 4px 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row.head { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; padding-block: 0 6px; }
+.row .who b { display: block; overflow-wrap: anywhere; }
+.row .who small, .row small { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.row .acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.num { font-family: var(--mono); font-size: .9rem; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .8rem; font-weight: 700; border: 1px solid currentColor; }
+.tag.ok { color: var(--good); } .tag.off { color: var(--bad); } .tag.wait { color: var(--warn); } .tag.me { color: var(--accent); }
+.empty { color: var(--muted); padding: 8px 0; margin: 0; }
+.gen { display: flex; gap: 8px; flex-wrap: wrap; }
+.gen input { flex: 1; min-width: 180px; min-height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.newlink { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--good); background: var(--bg); flex-wrap: wrap; }
+.newlink code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: .85rem; }
+.meter { height: 10px; border-radius: 999px; background: var(--sunk); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: inherit; min-width: 2px; }
+.total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.total b { font-family: var(--mono); font-size: 1.5rem; }
+.st .row { grid-template-columns: minmax(0, 1.8fr) minmax(0, .8fr) minmax(0, .8fr) minmax(0, .8fr); }
+.st .row > :not(:first-child) { text-align: right; }
+.hist .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, .8fr); }
+.gate { max-width: 420px; margin: 12vh auto 0; text-align: center; display: grid; gap: 14px; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: .95rem; max-width: calc(100% - 32px); }
+@media (max-width: 680px) {
+  .row, .st .row, .hist .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .row.head { display: none; }
+  .row > .c2, .row > .c3 { grid-column: 1; }
+  .gm .row .acts { grid-column: 1 / -1; justify-content: flex-start; }
+  .st .row > .c2, .st .row > .c3 { display: none; }
+  .hist .row > .c3 { grid-column: 1; }
+}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><h1>Dante’s GM Toolbox</h1><span data-t>Admin</span></div>
+  <a class="btn small" href="./" data-t>Open the toolbox</a>
+  <button type="button" class="btn small" id="signOut" hidden data-t>Sign out</button>
+</div></header>
+
+<div class="wrap">
+  <div class="gate" id="gate">
+    <p class="hint" id="gateMsg" data-t>Checking your account…</p>
+    <button type="button" class="btn primary" id="signIn" hidden data-t>Sign in as admin</button>
+  </div>
+
+  <main id="main" hidden>
+    <section class="card gm" aria-labelledby="hGm">
+      <div class="card-head"><h2 id="hGm" data-t>GMs</h2><span class="hint" id="gmCount"></span></div>
+      <p class="hint" data-t>Everyone who can sign in as a GM. Removing access stops them signing in; their bestiary stays in the database, so you can restore it later.</p>
+      <ul class="rows" id="gmList"></ul>
+    </section>
+
+    <section class="card" aria-labelledby="hInv">
+      <div class="card-head"><h2 id="hInv" data-t>Invite links</h2></div>
+      <p class="hint" data-t>Each link works once: whoever opens it and signs in with Google becomes a GM. Send it only to the person it’s for.</p>
+      <form class="gen" id="genForm" autocomplete="off">
+        <input id="genNote" maxlength="80" data-tp placeholder="Who is it for? (optional)" aria-label="Who is it for? (optional)">
+        <button type="submit" class="btn primary" data-t>Generate invite link</button>
+      </form>
+      <div class="newlink" id="newLink" hidden><code id="newLinkTxt"></code><button type="button" class="btn small" id="newLinkCopy" data-t>Copy</button></div>
+      <ul class="rows" id="codeList"></ul>
+    </section>
+
+    <section class="card st" aria-labelledby="hSt">
+      <div class="card-head"><h2 id="hSt" data-t>Storage</h2><button type="button" class="btn small" id="calc" data-t>Calculate now</button></div>
+      <div class="total"><b id="stTotal">—</b><span class="hint" id="stOf"></span></div>
+      <div class="meter" aria-hidden="true"><i id="stBar" style="width:0"></i></div>
+      <p class="hint" id="stWhen"></p>
+      <ul class="rows" id="stList"></ul>
+      <p class="hint" data-t>Sizes are estimates from the stored data. Firebase also counts its indexes, so the console’s Usage page can show a bit more.</p>
+    </section>
+
+    <section class="card hist" aria-labelledby="hHist">
+      <div class="card-head"><h2 id="hHist" data-t>Sign-in history</h2></div>
+      <ul class="rows" id="histList"></ul>
+      <div><button type="button" class="btn small" id="histMore" hidden data-t>Show more</button></div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  firebase.initializeApp({
+    apiKey: 'AIzaSyADoTwcuiWP1ptIYj7omAbanUrwEaBo6Ao', authDomain: 'dante-s-gm-tools.firebaseapp.com', projectId: 'dante-s-gm-tools',
+    storageBucket: 'dante-s-gm-tools.firebasestorage.app', messagingSenderId: '1068722879058', appId: '1:1068722879058:web:978d30ea27094921c93d8b'
+  });
+  const auth = firebase.auth(), fs = firebase.firestore();
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  /* ---- language: follows the toolbox's choice (same site), else the device ---- */
+  let lang = 'en'; try { const s = JSON.parse(localStorage.getItem('pb-lang')); lang = s === 'pt' || s === 'en' ? s : /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en'; } catch { lang = /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en'; }
+  const PT = {
+    'Admin': 'Admin', 'Open the toolbox': 'Abrir a ferramenta', 'Sign out': 'Sair', 'Checking your account…': 'Verificando sua conta…', 'Sign in as admin': 'Entrar como admin',
+    'GMs': 'Mestres', 'Everyone who can sign in as a GM. Removing access stops them signing in; their bestiary stays in the database, so you can restore it later.': 'Todos que podem entrar como mestre. Remover o acesso impede a entrada; o bestiário continua no banco de dados, então dá para restaurar depois.',
+    'Invite links': 'Links de convite', 'Each link works once: whoever opens it and signs in with Google becomes a GM. Send it only to the person it’s for.': 'Cada link funciona uma vez: quem abrir e entrar com o Google vira mestre. Envie só para a pessoa certa.',
+    'Who is it for? (optional)': 'Para quem é? (opcional)', 'Generate invite link': 'Gerar link de convite', 'Copy': 'Copiar', 'Copy link': 'Copiar link', 'Storage': 'Armazenamento', 'Calculate now': 'Calcular agora',
+    'Sizes are estimates from the stored data. Firebase also counts its indexes, so the console’s Usage page can show a bit more.': 'Os tamanhos são estimativas a partir dos dados guardados. O Firebase também conta os índices, então a página Uso do console pode mostrar um pouco mais.',
+    'Sign-in history': 'Histórico de entradas', 'Show more': 'Mostrar mais',
+    'Sign in with the admin Google account to manage the toolbox.': 'Entre com a conta Google do admin para gerenciar a ferramenta.',
+    '{0} isn’t the admin account.': '{0} não é a conta do admin.', 'Couldn’t load: {0}': 'Não foi possível carregar: {0}',
+    'GM': 'Mestre', 'Joined': 'Entrou em', 'Last sign-in': 'Última entrada', 'Status': 'Situação', 'Stored': 'Armazenado',
+    'Admin (you)': 'Admin (você)', 'Has access': 'Tem acesso', 'Access removed': 'Acesso removido', 'Invited, not signed in yet': 'Convidado, ainda não entrou',
+    'Remove access': 'Remover acesso', 'Restore access': 'Restaurar acesso', 'Cancel invite': 'Cancelar convite', 'never': 'nunca', 'No GMs yet.': 'Nenhum mestre ainda.',
+    '{0} GMs': '{0} mestres', '1 GM': '1 mestre',
+    'Remove {0}’s access? They can’t sign in any more. Their bestiary stays in the database.': 'Remover o acesso de {0}? Não poderá mais entrar. O bestiário continua no banco de dados.',
+    'Give {0} access again?': 'Dar acesso a {0} de novo?',
+    'For': 'Para', 'Created': 'Criado', 'Unused': 'Não usado', 'Used by {0}': 'Usado por {0}', 'Cancel': 'Cancelar', 'Remove from list': 'Tirar da lista', 'No invite links yet.': 'Nenhum link de convite ainda.',
+    'Cancel this invite link? It stops working.': 'Cancelar este link de convite? Ele para de funcionar.',
+    'Invite link ready. Copy it and send it.': 'Link de convite pronto. Copie e envie.', 'Link copied': 'Link copiado',
+    'What': 'O quê', 'Data': 'Dados', 'Pictures': 'Imagens', 'Total': 'Total',
+    'of the 1 GB free on the Spark plan': 'de 1 GB grátis no plano Spark', 'Not calculated yet. It reads the whole database once, so it can take a minute.': 'Ainda não calculado. Lê o banco de dados inteiro uma vez, então pode levar um minuto.',
+    'Calculated {0}': 'Calculado {0}', 'Reading {0}…': 'Lendo {0}…', 'Reading pictures… {0}': 'Lendo imagens… {0}',
+    'Shared SRD list': 'Lista SRD compartilhada', 'Pictures from before GM accounts': 'Imagens de antes das contas de mestre', 'used by your bestiary and the SRD': 'usadas pelo seu bestiário e pelo SRD',
+    'Old data from before GM accounts': 'Dados antigos de antes das contas de mestre', 'kept as a backup of the move': 'guardados como cópia de segurança da mudança',
+    'Players’ screens': 'Telas dos jogadores', 'Sign-in history and admin records': 'Histórico de entradas e registros do admin',
+    'GM without an account record': 'Mestre sem registro de conta',
+    'When': 'Quando', 'Device': 'Aparelho', 'How': 'Como', 'Sign-in': 'Entrada', 'Admin sign-in': 'Entrada do admin', 'Invite link': 'Link de convite', 'No sign-ins recorded yet.': 'Nenhuma entrada registrada ainda.',
+    '{0} docs': '{0} docs', 'Something went wrong: {0}': 'Algo deu errado: {0}'
+  };
+  const t = (s, ...a) => { let r = (lang === 'pt' && PT[s]) || s; a.forEach((v, i) => { r = r.split('{' + i + '}').join(v); }); return r; };
+  document.documentElement.lang = lang === 'pt' ? 'pt-BR' : 'en';
+  document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.textContent.trim()); });
+  document.querySelectorAll('[data-tp]').forEach(el => { el.placeholder = t(el.placeholder); el.setAttribute('aria-label', t(el.getAttribute('aria-label'))); });
+  const loc = lang === 'pt' ? 'pt-BR' : 'en-US';
+  const fmtDate = ms => ms ? new Intl.DateTimeFormat(loc, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms)) : t('never');
+  const ago = ms => {
+    if (!ms) return t('never');
+    const s = (ms - Date.now()) / 1000, rtf = new Intl.RelativeTimeFormat(loc, { numeric: 'auto' });
+    for (const [u, n] of [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]]) if (Math.abs(s) >= n) return rtf.format(Math.round(s / n), u);
+    return rtf.format(0, 'minute');
+  };
+  const fmtBytes = b => { b = b || 0; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(b < 10240 ? 1 : 0) + ' KB'; if (b < 1073741824) return (b / 1048576).toFixed(b < 10485760 ? 2 : 1) + ' MB'; return (b / 1073741824).toFixed(2) + ' GB'; };
+  let toastT = 0; const toast = m => { const el = $('#toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 3000); };
+  const fail = e => toast(t('Something went wrong: {0}', (e && (e.code || e.message)) || e));
+  const copy = async txt => { try { await navigator.clipboard.writeText(txt); toast(t('Link copied')); } catch { prompt('', txt); } };
+
+  /* ---- who is this? Only the admin may list the invites (see the Firestore rules). ---- */
+  const deviceName = () => {
+    const u = navigator.userAgent;
+    const b = /Edg\//.test(u) ? 'Edge' : /SamsungBrowser/.test(u) ? 'Samsung Internet' : /OPR\//.test(u) ? 'Opera' : /Firefox\//.test(u) ? 'Firefox' : /Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : 'Browser';
+    const o = /Android/.test(u) ? 'Android' : /iPhone|iPad|iPod/.test(u) ? 'iOS' : /Windows/.test(u) ? 'Windows' : /Mac OS X/.test(u) ? 'Mac' : /CrOS/.test(u) ? 'ChromeOS' : /Linux/.test(u) ? 'Linux' : '';
+    return o ? `${b} on ${o}` : b;
+  };
+  async function logSignIn() {
+    const u = auth.currentUser, at = Date.now();
+    try { await fs.collection('logins').add({ uid: u.uid, email: u.email || '', name: u.displayName || '', at, device: deviceName(), via: 'admin' }); } catch {}
+    try { await fs.doc('gms/' + u.uid).set({ lastSignIn: at, email: u.email || '', name: u.displayName || '' }, { merge: true }); } catch {}
+  }
+  const isAdmin = () => fs.collection('invites').limit(1).get().then(() => true, () => false);
+  const gate = (msg, showSignIn) => { $('#gate').hidden = false; $('#main').hidden = true; $('#gateMsg').textContent = msg; $('#signIn').hidden = !showSignIn; };
+
+  $('#signIn').addEventListener('click', async () => {
+    const p = new firebase.auth.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
+    try { await auth.signInWithPopup(p); }
+    catch (e) {
+      if (e && /popup-blocked|operation-not-supported/i.test(e.code || '')) { try { sessionStorage.setItem('pb-admin-signin', '1'); } catch {} return auth.signInWithRedirect(p); }
+      if (!(e && /popup-closed|cancelled-popup/i.test(e.code || ''))) fail(e);
+      return;
+    }
+    if (await isAdmin()) await logSignIn();
+    start();
+  });
+  $('#signOut').addEventListener('click', () => auth.signOut().then(() => location.reload()));
+
+  let me = null;
+  async function start() {
+    me = auth.currentUser;
+    $('#signOut').hidden = !me;
+    if (!me) return gate(t('Sign in with the admin Google account to manage the toolbox.'), true);
+    if (!(await isAdmin())) return gate(t('{0} isn’t the admin account.', me.email || ''), true);
+    $('#gate').hidden = true; $('#main').hidden = false;
+    loadAll(); loadHistory(true);
+  }
+  let redirected = false; try { redirected = !!sessionStorage.getItem('pb-admin-signin'); sessionStorage.removeItem('pb-admin-signin'); } catch {}
+  const off = auth.onAuthStateChanged(async () => {
+    off();
+    if (redirected) { try { const r = await auth.getRedirectResult(); if (r && r.user && await isAdmin()) await logSignIn(); } catch {} }
+    start();
+  });
+
+  /* ---- GMs and invite links ---- */
+  let gms = [], invites = [], codes = [], stats = null;
+  async function loadAll() {
+    try {
+      const [g, i, c, s] = await Promise.all([fs.collection('gms').get(), fs.collection('invites').get(), fs.collection('inviteCodes').get(), fs.doc('adminStats/usage').get()]);
+      gms = g.docs.map(d => ({ uid: d.id, ...d.data() }));
+      invites = i.docs.map(d => ({ email: d.id, ...d.data() }));
+      codes = c.docs.map(d => ({ code: d.id, ...d.data() })).sort((a, b) => (b.at || 0) - (a.at || 0));
+      stats = s.exists ? s.data() : null;
+      renderGMs(); renderCodes(); renderStorage();
+    } catch (e) { $('#gmList').innerHTML = `<li class="err">${esc(t('Couldn’t load: {0}', e.code || e.message))}</li>`; }
+  }
+  const gmName = uid => { const g = gms.find(x => x.uid === uid); return g ? (g.name || g.email || uid) : uid; };
+  function renderGMs() {
+    const byEmail = new Map();
+    gms.forEach(g => byEmail.set(String(g.email || g.uid).toLowerCase(), { gm: g }));
+    invites.forEach(i => { const r = byEmail.get(i.email) || {}; r.inv = i; byEmail.set(i.email, r); });
+    const rows = [...byEmail.entries()].map(([email, r]) => ({ email, ...r }));
+    const rank = r => r.gm && r.gm.uid === me.uid ? 0 : r.gm && r.inv ? 1 : r.inv ? 2 : 3;
+    rows.sort((a, b) => rank(a) - rank(b) || ((b.gm && b.gm.lastSignIn) || 0) - ((a.gm && a.gm.lastSignIn) || 0));
+    const active = rows.filter(r => rank(r) < 2).length;
+    $('#gmCount').textContent = active === 1 ? t('1 GM') : t('{0} GMs', active);
+    if (!rows.length) { $('#gmList').innerHTML = `<li class="empty">${esc(t('No GMs yet.'))}</li>`; return; }
+    $('#gmList').innerHTML = `<li class="row head"><span>${esc(t('GM'))}</span><span>${esc(t('Last sign-in'))}</span><span>${esc(t('Stored'))}</span><span></span></li>` + rows.map(r => {
+      const g = r.gm, mine = g && g.uid === me.uid, used = g && stats && stats.byUid && stats.byUid[g.uid];
+      const status = mine ? `<span class="tag me">${esc(t('Admin (you)'))}</span>` : g && r.inv ? `<span class="tag ok">${esc(t('Has access'))}</span>` : r.inv ? `<span class="tag wait">${esc(t('Invited, not signed in yet'))}</span>` : `<span class="tag off">${esc(t('Access removed'))}</span>`;
+      const act = mine ? '' : r.inv ? `<button type="button" class="btn small danger" data-revoke="${esc(r.email)}">${esc(t(g ? 'Remove access' : 'Cancel invite'))}</button>`
+        : `<button type="button" class="btn small" data-restore="${esc(r.email)}">${esc(t('Restore access'))}</button>`;
+      return `<li class="row"><span class="who"><b>${esc((g && g.name) || r.email)}</b><small>${esc(g && g.name ? r.email : '')}${g && g.createdAt ? `${g.name ? ' · ' : ''}${esc(t('Joined'))} ${esc(fmtDate(g.createdAt))}` : ''}</small> ${status}</span>`
+        + `<span class="c2"><span title="${esc(g ? fmtDate(g.lastSignIn) : '')}">${esc(g ? ago(g.lastSignIn) : '—')}</span></span>`
+        + `<span class="c3 num">${used ? esc(fmtBytes(used.data + used.pics)) : '—'}</span><span class="acts">${act}</span></li>`;
+    }).join('');
+  }
+  $('#gmList').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    try {
+      if (b.dataset.revoke) {
+        const email = b.dataset.revoke; if (!confirm(t('Remove {0}’s access? They can’t sign in any more. Their bestiary stays in the database.', email))) return;
+        b.disabled = true; await fs.doc('invites/' + email).delete();
+      } else if (b.dataset.restore) {
+        const email = b.dataset.restore; if (!confirm(t('Give {0} access again?', email))) return;
+        b.disabled = true; await fs.doc('invites/' + email).set({ at: Date.now(), via: 'restored' });
+      } else return;
+      await loadAll();
+    } catch (err) { b.disabled = false; fail(err); }
+  });
+
+  const code16 = () => { const a = 'abcdefghjkmnpqrstuvwxyz23456789'; return [...crypto.getRandomValues(new Uint8Array(16))].map(b => a[b % a.length]).join(''); };
+  const inviteUrl = c => location.origin + location.pathname.replace(/admin\.html$/, '') + '#invite/' + c;
+  $('#genForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button'); btn.disabled = true;
+    try {
+      const code = code16();
+      await fs.doc('inviteCodes/' + code).set({ at: Date.now(), note: $('#genNote').value.trim(), by: me.uid });
+      $('#genNote').value = ''; $('#newLinkTxt').textContent = inviteUrl(code); $('#newLink').hidden = false;
+      toast(t('Invite link ready. Copy it and send it.'));
+      await loadAll();
+    } catch (err) { fail(err); }
+    btn.disabled = false;
+  });
+  $('#newLinkCopy').addEventListener('click', () => copy($('#newLinkTxt').textContent));
+  function renderCodes() {
+    if (!codes.length) { $('#codeList').innerHTML = `<li class="empty">${esc(t('No invite links yet.'))}</li>`; return; }
+    $('#codeList').innerHTML = `<li class="row head"><span>${esc(t('For'))}</span><span>${esc(t('Created'))}</span><span>${esc(t('Status'))}</span><span></span></li>` + codes.map(c => {
+      const used = !!c.usedBy;
+      return `<li class="row"><span class="who"><b>${esc(c.note || '—')}</b><small class="num">…${esc(c.code.slice(-6))}</small></span>`
+        + `<span class="c2">${esc(fmtDate(c.at))}</span>`
+        + `<span class="c3">${used ? `<span class="tag ok">${esc(t('Used by {0}', c.usedBy))}</span><br><small>${esc(fmtDate(c.usedAt))}</small>` : `<span class="tag wait">${esc(t('Unused'))}</span>`}</span>`
+        + `<span class="acts">${used ? `<button type="button" class="btn small" data-del="${esc(c.code)}">${esc(t('Remove from list'))}</button>`
+          : `<button type="button" class="btn small" data-copy="${esc(c.code)}">${esc(t('Copy link'))}</button><button type="button" class="btn small danger" data-cancel="${esc(c.code)}">${esc(t('Cancel'))}</button>`}</span></li>`;
+    }).join('');
+  }
+  $('#codeList').addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.copy) return copy(inviteUrl(b.dataset.copy));
+    const code = b.dataset.cancel || b.dataset.del; if (!code) return;
+    if (b.dataset.cancel && !confirm(t('Cancel this invite link? It stops working.'))) return;
+    b.disabled = true;
+    try { await fs.doc('inviteCodes/' + code).delete(); await loadAll(); } catch (err) { b.disabled = false; fail(err); }
+  });
+
+  /* ---- storage: reads everything once and saves the totals in adminStats/usage ---- */
+  const enc = new TextEncoder(), u8 = s => enc.encode(s).length;
+  // Firestore's own size rules: strings = bytes + 1, numbers 8, booleans/null 1, map keys = bytes + 1, document = name + 32
+  const valSize = v => v == null ? 1 : typeof v === 'boolean' ? 1 : typeof v === 'number' ? 8 : typeof v === 'string' ? u8(v) + 1
+    : Array.isArray(v) ? v.reduce((s, x) => s + valSize(x), 0) : v instanceof firebase.firestore.Timestamp ? 8
+    : typeof v === 'object' ? Object.entries(v).reduce((s, [k, x]) => s + u8(k) + 1 + valSize(x), 0) : 8;
+  const docSize = d => u8(d.ref.path) + 1 + 32 + valSize(d.data());
+  async function readAll(path, pageSize, onPage) {
+    let last = null, n = 0, bytes = 0;
+    for (;;) {
+      let q = fs.collection(path).orderBy(firebase.firestore.FieldPath.documentId()).limit(pageSize);
+      if (last) q = q.startAfter(last);
+      const s = await q.get();
+      s.docs.forEach(d => { n++; bytes += docSize(d); onPage && onPage(d); });
+      if (s.size < pageSize) break;
+      last = s.docs[s.docs.length - 1].id;
+    }
+    return { n, bytes };
+  }
+  const GM_COLS = ['monsters', 'books', 'groups', 'heroes', 'encounters', 'maps', 'mapFolders', 'tokens'];
+  const OLD_COLS = [...GM_COLS, 'public', 'meta'];
+  $('#calc').addEventListener('click', async () => {
+    const btn = $('#calc'); btn.disabled = true;
+    const say = m => { $('#stWhen').textContent = m; };
+    try {
+      const out = { at: Date.now(), byUid: {}, srd: 0, legacyPics: 0, legacyData: 0, play: 0, other: 0, docs: 0 };
+      const g = await fs.collection('gms').get();
+      for (const d of g.docs) {
+        const uid = d.id, row = out.byUid[uid] = { data: docSize(d), pics: 0, docs: 1 };
+        say(t('Reading {0}…', gmName(uid)));
+        for (const c of GM_COLS) { const r = await readAll(`gms/${uid}/${c}`, 300); row.data += r.bytes; row.docs += r.n; }
+        const code = d.data().playerCode;
+        if (code) { const r = await readAll(`play/${code}/state`, 10); out.play += r.bytes; }
+      }
+      say(t('Reading {0}…', 'SRD')); out.srd = (await readAll('srd', 300)).bytes;
+      for (const c of OLD_COLS) { say(t('Reading {0}…', c)); out.legacyData += (await readAll(c, 300)).bytes; }
+      for (const c of ['logins', 'invites', 'inviteCodes', 'adminStats']) out.other += (await readAll(c, 300)).bytes;
+      let pics = 0;
+      await readAll('assets', 8, d => {
+        const sz = docSize(d), o = d.data().owner; pics++;
+        if (pics % 16 === 0) say(t('Reading pictures… {0}', pics));
+        if (o && out.byUid[o]) out.byUid[o].pics += sz;
+        else if (o) { out.byUid[o] = out.byUid[o] || { data: 0, pics: 0, docs: 0, orphan: true }; out.byUid[o].pics += sz; }
+        else out.legacyPics += sz;
+      });
+      out.total = Object.values(out.byUid).reduce((s, r) => s + r.data + r.pics, 0) + out.srd + out.legacyPics + out.legacyData + out.play + out.other;
+      await fs.doc('adminStats/usage').set(out);
+      stats = out; renderStorage(); renderGMs();
+    } catch (err) { fail(err); renderStorage(); }
+    btn.disabled = false;
+  });
+  function renderStorage() {
+    const s = stats;
+    if (!s) { $('#stTotal').textContent = '—'; $('#stOf').textContent = ''; $('#stBar').style.width = '0'; $('#stWhen').textContent = t('Not calculated yet. It reads the whole database once, so it can take a minute.'); $('#stList').innerHTML = ''; return; }
+    const GB = 1073741824;
+    $('#stTotal').textContent = fmtBytes(s.total); $('#stOf').textContent = t('of the 1 GB free on the Spark plan') + ` (${(s.total / GB * 100).toFixed(1)}%)`;
+    $('#stBar').style.width = Math.min(100, s.total / GB * 100) + '%';
+    $('#stWhen').textContent = t('Calculated {0}', `${ago(s.at)} · ${fmtDate(s.at)}`);
+    const line = (name, sub, data, pics) => `<li class="row"><span class="who"><b>${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><span class="c2 num">${data == null ? '' : esc(fmtBytes(data))}</span><span class="c3 num">${pics == null ? '' : esc(fmtBytes(pics))}</span><span class="num"><b>${esc(fmtBytes((data || 0) + (pics || 0)))}</b></span></li>`;
+    const gmRows = Object.entries(s.byUid || {}).sort((a, b) => (b[1].data + b[1].pics) - (a[1].data + a[1].pics)).map(([uid, r]) => {
+      const g = gms.find(x => x.uid === uid);
+      return line(g ? (g.name || g.email) : t('GM without an account record'), g && g.name ? g.email : uid === me.uid ? t('Admin (you)') : '', r.data, r.pics);
+    });
+    $('#stList').innerHTML = `<li class="row head"><span>${esc(t('What'))}</span><span>${esc(t('Data'))}</span><span>${esc(t('Pictures'))}</span><span>${esc(t('Total'))}</span></li>` + gmRows.join('')
+      + line(t('Shared SRD list'), '', s.srd, null)
+      + line(t('Pictures from before GM accounts'), t('used by your bestiary and the SRD'), null, s.legacyPics)
+      + line(t('Old data from before GM accounts'), t('kept as a backup of the move'), s.legacyData, null)
+      + line(t('Players’ screens'), '', s.play, null)
+      + line(t('Sign-in history and admin records'), '', s.other, null);
+  }
+
+  /* ---- sign-in history ---- */
+  let histLast = null;
+  async function loadHistory(fresh) {
+    const list = $('#histList');
+    try {
+      let q = fs.collection('logins').orderBy('at', 'desc').limit(40);
+      if (!fresh && histLast) q = q.startAfter(histLast);
+      const s = await q.get();
+      if (fresh) list.innerHTML = s.empty ? `<li class="empty">${esc(t('No sign-ins recorded yet.'))}</li>`
+        : `<li class="row head"><span>${esc(t('When'))}</span><span>${esc(t('GM'))}</span><span>${esc(t('Device'))}</span><span>${esc(t('How'))}</span></li>`;
+      histLast = s.docs[s.docs.length - 1] || histLast;
+      list.insertAdjacentHTML('beforeend', s.docs.map(d => {
+        const v = d.data(), how = v.via === 'admin' ? t('Admin sign-in') : v.via === 'invite' ? t('Invite link') : t('Sign-in');
+        return `<li class="row"><span><span title="${esc(fmtDate(v.at))}">${esc(fmtDate(v.at))}</span></span><span class="c2 who"><b>${esc(v.name || v.email)}</b><small>${esc(v.name ? v.email : '')}</small></span><span class="c3">${esc(v.device || '')}</span><span><small>${esc(how)}</small></span></li>`;
+      }).join(''));
+      $('#histMore').hidden = s.size < 40;
+    } catch (e) { list.innerHTML = `<li class="err">${esc(t('Couldn’t load: {0}', e.code || e.message))}</li>`; }
+  }
+  $('#histMore').addEventListener('click', () => loadHistory(false));
+})();
+</script>
+</body>
+</html>
