@@ -491,7 +491,9 @@ button.pv-thumb:hover { border-color: var(--accent); }
   .initview { grid-template-columns: minmax(340px, 460px) 1fr; }
   #initSide { display: block; border-left: 1px solid var(--line); }
 }
-.turnbar { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; align-items: center; gap: 8px; padding-block: 12px 10px; }
+.turnbar {  display: flex; align-items: center; gap: 8px; padding-block: 12px 10px; }
+/* Round / Prev / Next and Groups / + Add monster / Player view / Clear stay pinned while the list scrolls */
+.init-top { position: sticky; top: 0; z-index: 3; background: var(--bg); padding-bottom: 8px; }
 .turnbar .round { flex: 1; display: flex; align-items: baseline; gap: 8px; }
 .round span { font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .round b { font-family: var(--mono); font-size: 1.5rem; color: var(--accent); }
@@ -503,7 +505,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .add-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 12px; }
 .add-row .spacer { flex: 1; }
 .cblist { list-style: none; margin: 0; padding: 0 0 20px; display: grid; gap: 6px; }
-.cb { scroll-margin-top: 90px; display: grid; grid-template-columns: 48px 40px minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.cb { scroll-margin-top: 150px; display: grid; grid-template-columns: 48px 40px minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .cb.current { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); background: var(--accent-soft); }
 .cb.down { opacity: .55; }
 .cb-pic { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); overflow: hidden; display: grid; place-items: center; font-family: var(--display); font-size: 1.15rem; color: var(--muted); }
@@ -803,6 +805,7 @@ button.cb-pic { cursor: zoom-in; }
 
   <main class="initview" id="initView" aria-label="Initiative tracker">
     <section class="pane gutter" id="initMain">
+      <div class="init-top">
       <div class="turnbar">
         <div class="round"><span>Round</span><b id="roundNo">—</b></div>
         <button class="btn" data-act="turn-prev" id="prevBtn" aria-label="Previous turn">◂ Prev</button>
@@ -818,6 +821,7 @@ button.cb-pic { cursor: zoom-in; }
         <button class="btn small ghost" data-act="pv-share">Player view</button>
         <span class="spacer"></span>
         <button class="btn small ghost danger" data-act="enc-clear" id="encClear">Clear</button>
+      </div>
       </div>
       <ol class="cblist" id="cbList"></ol>
       <div class="empty" id="encEmpty">
@@ -1619,7 +1623,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-141003';
+const APP_BUILD = '20261123-142233';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
