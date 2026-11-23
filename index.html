@@ -88,6 +88,8 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .app[data-view="detail"] #listPane { display: none; }
 .detail-bar .sb-close { display: none; width: 34px; height: 34px; }  /* wide screens only; phones have "← List" */
 /* Monster and map lists: books + search stay put on top; only the list below scrolls (with its own scrollbar). */
+/* Same for the initiative list: the Round and Groups bars stay put, only the creatures scroll. */
+#initMain { display: flex; flex-direction: column; overflow: hidden; }
 #listPane, .map-list-pane { display: flex; flex-direction: column; overflow: hidden; }
 #listPane > .list-tools, .map-list-pane > .list-tools { flex: none; position: static; }
 .list-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
@@ -493,7 +495,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 }
 .turnbar {  display: flex; align-items: center; gap: 8px; padding-block: 12px 10px; }
 /* Round / Prev / Next and Groups / + Add monster / Player view / Clear stay pinned while the list scrolls */
-.init-top { position: sticky; top: 0; z-index: 3; background: var(--bg); padding-bottom: 8px; }
+.init-top { flex: none; background: var(--bg); padding-bottom: 8px; }
 .turnbar .round { flex: 1; display: flex; align-items: baseline; gap: 8px; }
 .round span { font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .round b { font-family: var(--mono); font-size: 1.5rem; color: var(--accent); }
@@ -823,10 +825,12 @@ button.cb-pic { cursor: zoom-in; }
         <button class="btn small ghost danger" data-act="enc-clear" id="encClear">Clear</button>
       </div>
       </div>
+      <div class="list-scroll" id="initScroll">
       <ol class="cblist" id="cbList"></ol>
       <div class="empty" id="encEmpty">
         <h3>No one in the fight yet</h3>
         <p>Add players with their initiative, then add monsters from your bestiary. Monsters roll initiative and track their own hit points.</p>
+      </div>
       </div>
     </section>
     <section class="pane gutter" id="initSide" aria-label="Stat block">
@@ -1623,7 +1627,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-142233';
+const APP_BUILD = '20261123-142453';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3703,7 +3707,7 @@ function stashScreen() {
   ss.set('pb-screen', {
     at: Date.now(), tab: $('#app').dataset.tab, view: $('#app').dataset.view, selectedId: state.selectedId,
     sheetId: $('#sbSheet').hidden ? null : state.sheetId, encSel: state.encSel,
-    scroll: { initMain: $('#initMain').scrollTop, initSide: $('#initSide').scrollTop, sheet: $('#sbSheet').scrollTop, list: $('#listScroll').scrollTop, detail: $('#detailPane').scrollTop },
+    scroll: { initMain: $('#initScroll').scrollTop, initSide: $('#initSide').scrollTop, sheet: $('#sbSheet').scrollTop, list: $('#listScroll').scrollTop, detail: $('#detailPane').scrollTop },
     trayOpen: !$('#trayMore').hidden, mode: state.mode, log: state.log.slice(0, 15)
   });
 }
@@ -3721,7 +3725,7 @@ function restoreScreen() {
   renderEncounter();
   const sc = s.scroll || {};
   requestAnimationFrame(() => {
-    $('#initMain').scrollTop = sc.initMain || 0; $('#initSide').scrollTop = sc.initSide || 0; $('#sbSheet').scrollTop = sc.sheet || 0;
+    $('#initScroll').scrollTop = sc.initMain || 0; $('#initSide').scrollTop = sc.initSide || 0; $('#sbSheet').scrollTop = sc.sheet || 0;
     $('#listScroll').scrollTop = sc.list || 0; $('#detailPane').scrollTop = sc.detail || 0;
   });
 }
