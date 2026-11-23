@@ -37,20 +37,21 @@
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
   --radius: 10px;
   --side-pc: #2f6fd0; --side-mon: #c0392b;  /* initiative: players blue, monsters red */
+  --turn: #23a455; --turn-ink: #ffffff;  /* whose turn it is: green, so it never clashes with the red of monsters */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299;
     --line: #2c332e; --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f;
-    --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e;
+    --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e; --turn: #3ddc84; --turn-ink: #062b14;
   }
 }
 :root[data-theme="light"] { color-scheme: only light; }
 :root[data-theme="dark"] {
   --bg: #111412; --surface: #191d1a; --sunk: #0c0e0d; --ink: #e4e8e1; --muted: #98a299;
   --line: #2c332e; --accent: #e2676c; --accent-ink: #1b0a0b; --accent-soft: #e2676c1f;
-  --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e;
+  --good: #6cc490; --bad: #f08a6a; color-scheme: dark; --side-pc: #6aa3ff; --side-mon: #ff6b5e; --turn: #3ddc84; --turn-ink: #062b14;
 }
 [hidden] { display: none !important; }
 html { box-sizing: border-box; height: 100%; background: var(--bg); }  /* also fills the notch / safe-area edges on phones */
@@ -375,7 +376,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-name { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv.now { border-color: var(--accent); box-shadow: inset 5px 0 0 var(--accent); background: var(--accent-soft); font-size: 1.3rem; padding-block: 16px; }
 .pv.down .pv-name { text-decoration: line-through; color: var(--muted); }
-.pv-tag { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.pv-tag { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--turn); color: var(--turn-ink); }
 .pv-tag.soft { background: var(--sunk); color: var(--muted); }
 .app[data-role="player"] .tray { display: none; }
 .pv-rolls h3 { font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 8px 0 8px; }
@@ -412,7 +413,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 @keyframes pvfresh { 0% { background: var(--accent); transform: scale(1.03); } 100% { background: var(--surface); transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pv-last.fresh, .pv-now.fresh { animation: none; } }
 /* Current turn card: stays pinned at the top while the turn order scrolls under it. */
-.pv-now { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); box-shadow: 0 6px 14px -8px #000000a6; }
+.pv-now { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--turn); background: var(--surface); box-shadow: 0 6px 14px -8px #000000a6; }
 .pv-now[hidden] { display: none; }
 .pv-now .k { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .pv-now .pv-thumb { grid-row: span 2; width: 64px; height: 64px; font-size: 1.6rem; }
@@ -514,7 +515,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 button.cb-pic { cursor: zoom-in; }
 .cb-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cb.down .cb-pic { filter: grayscale(1); }
-.cb.current .cb-pic { border-color: var(--accent); }
+.cb.current .cb-pic { border-color: var(--turn); }
 .cb-init { width: 100%; height: 44px; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 1.1rem; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
 .cb-main { min-width: 0; display: grid; gap: 3px; }
 .cb-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
@@ -533,7 +534,7 @@ button.cb-pic { cursor: zoom-in; }
 .cb.pc, .pv.pc { --side: var(--side-pc); }
 .cb.mon, .pv.mon { --side: var(--side-mon); }
 .cb.pc, .cb.mon, .pv.pc, .pv.mon { box-shadow: inset 6px 0 0 var(--side); background: color-mix(in srgb, var(--side) 9%, var(--surface)); }
-.cb.current, .pv.now { border-color: var(--accent); box-shadow: inset 6px 0 0 var(--side, var(--accent)), 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--side, var(--accent)) 20%, var(--surface)); }
+.cb.current, .pv.now { border-color: var(--turn); box-shadow: inset 6px 0 0 var(--side, var(--turn)), 0 0 0 2px var(--turn); background: color-mix(in srgb, var(--side, var(--accent)) 20%, var(--surface)); }
 .cb.hidden-mon { border-color: var(--muted); }
 .cb-hide { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 0 4px; font-size: .84rem; color: var(--muted); cursor: pointer; }
 .cb-hide input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
@@ -1627,7 +1628,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-142453';
+const APP_BUILD = '20261123-142715';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
