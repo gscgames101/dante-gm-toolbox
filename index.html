@@ -1540,7 +1540,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-134207';
+const APP_BUILD = '20261123-134326';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -4989,7 +4989,7 @@ function marksSvg(m, marks, dm) {
     else if (k.k === 'text') out += `<g${dmc(k)}>${label(k.x, k.y, k.s, k.c, k.t || '')}</g>`;
     else if (k.k === 'pin') {
       const r = pinR(k, b);
-      out += `<g${dmc(k)} transform="translate(${k.x},${k.y})"><path d="M0 0 C ${-r} ${-r * 1.4} ${-r} ${-r * 2.6} 0 ${-r * 2.6} C ${r} ${-r * 2.6} ${r} ${-r * 1.4} 0 0 Z" fill="${k.c}" stroke="#fff" stroke-width="${b * 2}"${k.vis === 'dm' ? ` stroke-dasharray="${b * 4} ${b * 3}"` : ''}/><circle cy="${-r * 1.75}" r="${r * 0.38}" fill="#fff"/>${k.t ? label(r * 1.1, -r * 1.6, r * 1.3, '#fff', k.t) : ''}</g>`;
+      out += `<g${dmc(k)} transform="translate(${k.x},${k.y})"><path d="M0 0 C ${-r} ${-r * 1.4} ${-r} ${-r * 2.6} 0 ${-r * 2.6} C ${r} ${-r * 2.6} ${r} ${-r * 1.4} 0 0 Z" fill="${k.c}" stroke="#fff" stroke-width="${(r * 0.12).toFixed(1)}"${k.vis === 'dm' ? ` stroke-dasharray="${(r * 0.3).toFixed(1)} ${(r * 0.22).toFixed(1)}"` : ''}/><circle cy="${-r * 1.75}" r="${r * 0.38}" fill="#fff"/>${k.t ? label(r * 1.1, -r * 1.6, r * 1.3, '#fff', k.t) : ''}</g>`;
     }
   }
   return out;
