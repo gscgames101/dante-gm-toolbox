@@ -407,7 +407,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 @keyframes pvfresh { 0% { background: var(--accent); transform: scale(1.03); } 100% { background: var(--surface); transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pv-last.fresh, .pv-now.fresh { animation: none; } }
 /* Current turn card: stays pinned at the top while the turn order scrolls under it. */
-.pv-now { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); box-shadow: 0 6px 14px -8px #000000a6; }
+.pv-now { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 14px; padding: 12px 16px; border-radius: var(--radius); border: 2px solid var(--accent); background: var(--surface); box-shadow: 0 6px 14px -8px #000000a6; }
 .pv-now[hidden] { display: none; }
 .pv-now .k { grid-column: 1 / -1; font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .pv-now .pv-thumb { grid-row: span 2; width: 64px; height: 64px; font-size: 1.6rem; }
@@ -418,6 +418,9 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .pv-now:not(:has(.pv-thumb + .who + .nx)) .pv-thumb { grid-row: auto; }
 .pv-now.fresh { animation: pvfresh 1.6s ease-out; }
 .pv-wrap > .pv-cols .pv-now { order: 2; }
+/* Initiative + Round and the Current turn card stay pinned at the top while the turn order scrolls under them. */
+.pv-top { position: sticky; top: 0; z-index: 3; display: grid; gap: 14px; padding-block: 2px 8px; background: var(--bg); }
+.pv-wrap > .pv-cols .pv-top { order: 1; }
 .pv-at { margin: 0; text-align: center; font-size: .78rem; color: var(--muted); }
 .pv-steps { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 .add-row { flex-wrap: wrap; }
@@ -914,11 +917,13 @@ button.cb-pic { cursor: zoom-in; }
       </div>
       <div class="pv-cols">
         <div class="pv-col pv-col-list">
+          <div class="pv-top">
           <div class="pv-head">
             <h2>Initiative</h2>
             <div class="round"><span>Round</span><b id="pvRound">—</b></div>
           </div>
           <section class="pv-now" id="pvNow" aria-live="polite" hidden></section>
+          </div>
           <ol class="pv-list" id="pvList"></ol>
           <div class="empty" id="pvEmpty"><h3>No fight yet</h3><p>The turn order appears here when your DM starts an encounter. It updates by itself.</p></div>
         </div>
@@ -1531,7 +1536,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-130029';
+const APP_BUILD = '20261123-130403';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
