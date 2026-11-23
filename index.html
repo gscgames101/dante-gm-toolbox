@@ -1544,13 +1544,25 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-135628';
+const APP_BUILD = '20261123-135839';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
   try { if (sessionStorage.getItem('pb-reloaded-for') === b) return; sessionStorage.setItem('pb-reloaded-for', b); } catch { return; }
   location.replace(location.pathname + '?v=' + encodeURIComponent(b) + location.hash);  // the ?v= skips the browser's cached copy
 }
+/* Players' screens also check the website itself every few minutes (and when the tab comes back to the front),
+   so they update even if the DM's screen is still on an older version. A "no-cache" request is answered with a
+   tiny "not modified" when nothing changed. */
+async function checkSiteBuild() {
+  if (!SITE || APP_BUILD === '__BUILD__' || state.role !== 'player' || document.visibilityState !== 'visible') return;
+  try {
+    const html = await (await fetch(location.pathname, { cache: 'no-cache' })).text();
+    const b = (html.match(/const APP_BUILD = '(\d{8}-\d{6})';/) || [])[1];
+    if (b) reloadIfOutdated({ build: b });
+  } catch {}
+}
+if (SITE) { setInterval(checkSiteBuild, 4 * 60 * 1000); document.addEventListener('visibilitychange', checkSiteBuild); }
 const imgSrc = id => SITE ? SITE.imgSrc(id) : '/_blob/' + id;
 const thumbSrc = m => imgSrc(isAssetId(m.thumb) ? m.thumb : m.image);  // small copy for lists
 /* Remove an uploaded picture only when no saved monster still uses it (duplicates share pictures). */
