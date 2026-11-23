@@ -1531,7 +1531,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-125641';
+const APP_BUILD = '20261123-130029';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3759,6 +3759,13 @@ function renderPlayerView(d) {
       <span class="who"><b>${esc(cur.name)}</b>${cur.pc ? '<span class="pc-tag">PC</span>' : ''}</span>
       ${nx && nx !== cur ? `<span class="nx">Up next: <b>${esc(nx.name)}</b></span>` : ''}`;
     if (pvNowKey !== null && key !== pvNowKey) { nowEl.classList.remove('fresh'); void nowEl.offsetWidth; nowEl.classList.add('fresh'); }
+    // A new turn (or the first time this screen shows the fight): scroll the list so that creature is in the middle.
+    // Only on a turn change, so players can still scroll around freely in between.
+    const first = pvNowKey === null;
+    if (key !== pvNowKey) requestAnimationFrame(() => {
+      const row = document.querySelector('#pvList .pv.now');
+      if (row && row.offsetParent) row.scrollIntoView({ block: 'center', behavior: first || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
     pvNowKey = key;
   } else if (d) pvNowKey = '';
 }
