@@ -1540,7 +1540,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-132402';
+const APP_BUILD = '20261123-134008';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -4972,7 +4972,7 @@ function loadMapInto(v, imgEl, svgEl, m) {
 
 /* --- drawing the marks --- */
 // Pin size follows the S/M/L size it was made with (older pins: a default size).
-const pinR = (k, b) => k.s ? k.s * 0.5 : b * 18;
+const pinR = (k, b) => k.s ? k.s * 0.25 : b * 9;  // half the size they used to be drawn at
 function marksSvg(m, marks, dm) {
   const b = mapBase(m), list = dm ? marks : marks.filter(k => k.vis !== 'dm');
   const pts = p => { let s = ''; for (let i = 0; i + 1 < p.length; i += 2) s += (i ? ' ' : '') + p[i] + ',' + p[i + 1]; return s; };
@@ -5234,7 +5234,8 @@ function dmTool() {
         if (hit) changeMarks(marks => marks.filter(x => x.id !== hit.id)); else toast('Tap right on a mark to erase it.');
       } else if (state.mapTool === 'pin' || state.mapTool === 'text') {
         openMarkDlg({ id: newMarkId(), k: state.mapTool, c: state.mapColor, vis: state.mapVis, x: Math.round(pt.x), y: Math.round(pt.y),
-          s: Math.round(24 * mapBase(m) * sizeK()), t: '', n: '' }, true);
+          // like the pen: the same size on screen at any zoom, so a pin placed zoomed-in is smaller on the map
+          s: Math.max(4, Math.round(24 * mapBase(m) * sizeK() / Math.max(1, dmViewer.s / dmViewer.fitS))), t: '', n: '' }, true);
       }
     },
     cancel() { stroke = null; fogOp = null; if (tokDrag) { tokDrag = null; drawDmTokens(); } if (poly) drawPoly(); else drawDmMarks(); }
