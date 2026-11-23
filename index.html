@@ -664,6 +664,10 @@ button.cb-pic { cursor: zoom-in; }
 .color-pick input { width: 44px; height: 44px; margin: -7px; border: 0; padding: 0; cursor: pointer; background: none; }
 .map-stage { position: relative; flex: 1; min-height: 260px; overflow: hidden; background: var(--sunk); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
 .map-stage.drawing { cursor: crosshair; }
+/* Pin label / token name tooltip, positioned above the pin by the viewer */
+.map-tip { position: absolute; z-index: 6; transform: translate(-50%, calc(-100% - 8px)); padding: 4px 10px; border-radius: 6px; background: #000000d9; color: #fff; font-weight: 700; font-size: .95rem; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px #0008; }
+.map-tip::after { content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #000000d9; }
+.map-tip[hidden] { display: none; }
 .map-stage.panning, .map-stage.panning.drawing { cursor: grab; }
 .map-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .map-canvas img, .map-canvas svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; user-select: none; -webkit-user-drag: none; }
@@ -883,7 +887,7 @@ button.cb-pic { cursor: zoom-in; }
             </span>
           </div>
         </div>
-        <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks" id="mapToks"></div></div></div>
+        <div class="map-stage" id="mapStage"><div class="map-canvas" id="mapCanvas"><img id="mapImg" alt="" draggable="false"><svg id="mapSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks" id="mapToks"></div></div><div class="map-tip" hidden></div></div>
       </div>
     </section>
   </main>
@@ -901,7 +905,7 @@ button.cb-pic { cursor: zoom-in; }
   <main class="pane gutter player-view" id="playerView" aria-label="Initiative order">
     <section class="pv-map" id="pvMap" hidden>
       <div class="pv-map-body">
-        <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks pv-toks" id="pvToks"></div></div></div>
+        <div class="map-stage" id="pvStage"><div class="map-canvas" id="pvCanvas"><img id="pvMapImg" alt="" draggable="false"><svg id="pvSvg" xmlns="http://www.w3.org/2000/svg"></svg><div class="map-toks pv-toks" id="pvToks"></div></div><div class="map-tip" hidden></div></div>
         <aside class="pv-pin" id="pvPinNote" aria-label="Pin" aria-live="polite" hidden>
           <div class="pv-pin-head">
             <span class="pv-pin-dot" id="pvPinDot"></span>
@@ -1540,7 +1544,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-134326';
+const APP_BUILD = '20261123-134716';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -4878,7 +4882,13 @@ async function addMapFromFile(file) {
 /* --- the viewer: pan with a drag, zoom with the wheel or a pinch (shared by the DM and the players) --- */
 function makeViewer(stage, canvas) {
   const v = { s: 1, x: 0, y: 0, w: 1, h: 1, fitS: 1, pts: new Map(), pinch: null, drag: null, tool: null, onTap: null };
-  v.apply = () => { canvas.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`; if (v.onChange) v.onChange(); };
+  v.apply = () => { canvas.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.s})`; if (v.tip && !v.tip.hidden && v.tipAt) { v.tip.style.left = (v.x + v.tipAt.x * v.s) + 'px'; v.tip.style.top = (v.y + v.tipAt.y * v.s) + 'px'; } if (v.onChange) v.onChange(); };
+  // A small tooltip above a point of the map (map pixels): pin labels and token names. It moves with the map.
+  v.tip = stage.querySelector('.map-tip');
+  v.showTip = (x, y, text) => { if (!v.tip || !text) return; v.tipAt = { x, y }; v.tip.textContent = text; v.tip.style.left = (v.x + x * v.s) + 'px'; v.tip.style.top = (v.y + y * v.s) + 'px'; v.tip.hidden = false; };
+  v.hideTip = () => { if (v.tip) v.tip.hidden = true; };
+  stage.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && !e.buttons && v.onHover) v.onHover(v.toImage(e)); });
+  stage.addEventListener('pointerleave', () => v.hideTip());
   // What part of the map is on screen: centre and size, in map pixels (sent to players by "Sync view").
   v.getView = () => { const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return v.lastView || null;  // hidden: keep the last one
     return v.lastView = { cx: Math.round((r.width / 2 - v.x) / v.s), cy: Math.round((r.height / 2 - v.y) / v.s), vw: Math.round(r.width / v.s), vh: Math.round(r.height / v.s) }; };
@@ -4989,7 +4999,7 @@ function marksSvg(m, marks, dm) {
     else if (k.k === 'text') out += `<g${dmc(k)}>${label(k.x, k.y, k.s, k.c, k.t || '')}</g>`;
     else if (k.k === 'pin') {
       const r = pinR(k, b);
-      out += `<g${dmc(k)} transform="translate(${k.x},${k.y})"><path d="M0 0 C ${-r} ${-r * 1.4} ${-r} ${-r * 2.6} 0 ${-r * 2.6} C ${r} ${-r * 2.6} ${r} ${-r * 1.4} 0 0 Z" fill="${k.c}" stroke="#fff" stroke-width="${(r * 0.12).toFixed(1)}"${k.vis === 'dm' ? ` stroke-dasharray="${(r * 0.3).toFixed(1)} ${(r * 0.22).toFixed(1)}"` : ''}/><circle cy="${-r * 1.75}" r="${r * 0.38}" fill="#fff"/>${k.t ? label(r * 1.1, -r * 1.6, r * 1.3, '#fff', k.t) : ''}</g>`;
+      out += `<g${dmc(k)} transform="translate(${k.x},${k.y})"><path d="M0 0 C ${-r} ${-r * 1.4} ${-r} ${-r * 2.6} 0 ${-r * 2.6} C ${r} ${-r * 2.6} ${r} ${-r * 1.4} 0 0 Z" fill="${k.c}" stroke="#fff" stroke-width="${(r * 0.12).toFixed(1)}"${k.vis === 'dm' ? ` stroke-dasharray="${(r * 0.3).toFixed(1)} ${(r * 0.22).toFixed(1)}"` : ''}/><circle cy="${-r * 1.75}" r="${r * 0.38}" fill="#fff"/></g>`;  // the label shows as a tooltip (hover or tap), not on the map
     }
   }
   return out;
@@ -5046,6 +5056,12 @@ function renderMapWork() {
     dmViewer.onChange = () => { if (state.mapSync && state.shownMap && state.shownMap.id === state.mapId) viewPushSoon(); };
     // Polygon fog tool: a line follows the pointer; double-click or Enter closes the shape, Esc cancels it.
     $('#mapStage').addEventListener('pointermove', e => { if (!e.buttons) dmViewer.tool.hover(e); });
+    // Mouse hover over a pin: its label as a tooltip (tokens show their name from the browser's own tooltip).
+    dmViewer.onHover = pt => {
+      const m = curMap(); if (!m) return;
+      const k = hitMark(m, m.marks, pt, dmViewer.s);
+      if (k && k.k === 'pin' && k.t) dmViewer.showTip(k.x, k.y - pinR(k, mapBase(m)) * 2.6, k.t); else dmViewer.hideTip();
+    };
     $('#mapStage').addEventListener('dblclick', () => dmViewer.tool.finishPoly());
     addEventListener('keydown', e => {
       if (!$('#mapStage').offsetParent || (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]'))) return;
@@ -5359,18 +5375,26 @@ function renderPvTab() {
   $('#pvMapName').textContent = m.name || 'Map';
   if (!pvViewer) {
     pvViewer = makeViewer($('#pvStage'), $('#pvCanvas'));
+    // Mouse hover: token names and pin labels as a tooltip (nothing under fog).
+    pvViewer.onHover = pt => {
+      const cur = state.pvMapData; if (!cur) return;
+      const tk = (cur.tokens || []).slice().reverse().find(t => Math.hypot(pt.x - t.x, pt.y - t.y) <= t.s / 2);
+      if (tk) return pvViewer.showTip(tk.x, tk.y - tk.s / 2, tk.name);
+      const k = isFogged(cur, pt) ? null : hitMark(cur, cur.marks || [], pt, pvViewer.s);
+      if (k && k.k === 'pin' && k.t) pvViewer.showTip(k.x, k.y - pinR(k, mapBase(cur)) * 2.6, k.t); else pvViewer.hideTip();
+    };
     pvViewer.onTap = pt => {
       const cur = state.pvMapData; if (!cur) return;
       // A token under the tap: show its name.
       const tk = (cur.tokens || []).slice().reverse().find(t => Math.hypot(pt.x - t.x, pt.y - t.y) <= t.s / 2);
-      if (tk) {
-        $('#pvPinKicker').textContent = 'Token'; $('#pvPinTitle').textContent = tk.name; $('#pvPinTitle').classList.remove('none');
-        $('#pvPinNoteWrap').hidden = true; $('#pvPinDot').style.background = tk.rim; $('#pvPinNote').hidden = false; return;
-      }
+      if (tk) { $('#pvPinNote').hidden = true; pvViewer.showTip(tk.x, tk.y - tk.s / 2, tk.name); return; }
       $('#pvPinKicker').textContent = 'Pin';
       const hit = isFogged(cur, pt) ? null : hitMark(cur, cur.marks || [], pt, pvViewer.s);  // nothing under fog can be tapped
       const panel = $('#pvPinNote');
-      if (!hit || hit.k !== 'pin' || !(hit.t || hit.n)) { panel.hidden = true; return; }
+      if (!hit || hit.k !== 'pin' || !(hit.t || hit.n)) { panel.hidden = true; pvViewer.hideTip(); return; }
+      // the label pops up above the pin; the side panel only opens for pins with notes
+      pvViewer.hideTip(); pvViewer.showTip(hit.x, hit.y - pinR(hit, mapBase(cur)) * 2.6, hit.t);
+      if (!hit.n) { panel.hidden = true; return; }
       const title = $('#pvPinTitle');
       title.textContent = hit.t || 'Untitled pin'; title.classList.toggle('none', !hit.t);
       $('#pvPinText').textContent = hit.n || '';
