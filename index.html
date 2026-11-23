@@ -482,7 +482,7 @@ button.pv-thumb:hover { border-color: var(--accent); }
 .add-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 12px; }
 .add-row .spacer { flex: 1; }
 .cblist { list-style: none; margin: 0; padding: 0 0 20px; display: grid; gap: 6px; }
-.cb { display: grid; grid-template-columns: 48px 40px minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.cb { scroll-margin-top: 90px; display: grid; grid-template-columns: 48px 40px minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .cb.current { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); background: var(--accent-soft); }
 .cb.down { opacity: .55; }
 .cb-pic { width: 40px; height: 40px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); overflow: hidden; display: grid; place-items: center; font-family: var(--display); font-size: 1.15rem; color: var(--muted); }
@@ -1531,7 +1531,7 @@ const isAssetId = v => typeof v === 'string' && /^[0-9a-f]{32}$/i.test(v);
 const SITE = window.SITE || null;
 /* Website build stamp (filled in by build.ps1). The DM's screen sends it with every update; a player's screen that is
    older reloads itself once, so players never run outdated code (e.g. drawing new fog shapes wrong). */
-const APP_BUILD = '20261123-124550';
+const APP_BUILD = '20261123-125641';
 function reloadIfOutdated(d) {
   const b = d && d.build;
   if (!SITE || !b || APP_BUILD === '__BUILD__' || b <= APP_BUILD) return;
@@ -3872,8 +3872,12 @@ function moveTurn(step) {
   if (cur.kind === 'monster') state.encSel = cur.id;
   encChanged();
   schedulePlayersUpdate();
-  const row = document.querySelector(`[data-cb="${cur.id}"]`);
-  if (row) row.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  // Bring the creature whose turn it is to the middle of the list (after the list has redrawn), so it's never
+  // hidden under the pinned Round / Prev / Next bar and the next few are visible too.
+  requestAnimationFrame(() => {
+    const row = document.querySelector(`#cbList [data-cb="${cur.id}"]`);
+    if (row) row.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  });
 }
 function hpPanel(c, ctx) {
   return `<div class="cb-hp">
